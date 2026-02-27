@@ -1,9 +1,12 @@
-# opinion-analyzer
-Analyzes opinions from major opinion sheets and prints relevant statistics to assist with placement/movement of levels in their respective difficulty categories.
+# sheets-opinion-analyzer
+Analyzes player opinions from google sheets and prints relevant statistics to assist with placement/movement of levels in their respective difficulty categories.
 
-Credit to Amberette/Cadrega for inspiration and basic config structures.
+Credit to `Amberette/Cadrega` for inspiration and basic config structures.
 
 ## Setup
+
+This project uses `clasp` to sync changes between github and google apps script. Some linux terminal and git knowledge required.
+
 
 After you fork the repository and clone it to your local system, navigate to the root folder
 ### On Linux (or WSL):
@@ -98,4 +101,4 @@ clasp push
 ## Using the sheet
 
 ### Example output
-<img width="1200" height="774" alt="image" src="https://github.com/user-attachments/assets/91aa483e-26b3-474f-b1fa-6cccd709663d" />
+<img width="1191" height="759" alt="image" src="https://github.com/user-attachments/assets/262b0181-b6f1-4881-8005-f34692e8e43f" />
