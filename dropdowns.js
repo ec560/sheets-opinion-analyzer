@@ -18,6 +18,15 @@ function onEdit(e) {
   }
 }
 
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu("Tier Tools")
+    .addItem("Setup", "setupTierAnalysis")
+    .addItem("Refresh", "populateSelectedLevel")
+    .addItem("Analyze Selected Level", "analyzeSelectedLevel")
+    .addToUi();
+}
+
 // when a level is selected, populate A:C with player/opinion/reliability for that level
 function refreshLevelDropdown_() {
   const ss = SpreadsheetApp.getActive();
