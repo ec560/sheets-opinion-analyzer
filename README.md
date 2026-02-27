@@ -1,5 +1,7 @@
 # opinion-analyzer
-Analyzes opinions from major opinion sheets and prints relevant statistics to assist with placement/movement of levels in their respective difficulty categories
+Analyzes opinions from major opinion sheets and prints relevant statistics to assist with placement/movement of levels in their respective difficulty categories.
+
+Credit to Amberette/Cadrega for inspiration and basic config structures.
 
 ## Setup
 
@@ -70,6 +72,28 @@ Refresh your Google Sheet; You should now see a new **"Tier Tools"** menu button
 Pressing the "Setup" button from Tier Tools will create the **Tier Analysis** sheet.
 
 ---
+
+## Updating to Latest Version
+
+If you forked the repository you must run the following command in your root folder first:
+
+```bash
+git remote add upstream https://github.com/ec560/sheets-opinion-analyzer.git
+```
+
+1. Pull the latest repository changes:
+
+```bash
+git pull
+```
+
+2. Push updates to your Google Sheet:
+
+```bash
+clasp push
+```
+
+3. Refresh your spreadsheet.
 
 ## Using the sheet
 
