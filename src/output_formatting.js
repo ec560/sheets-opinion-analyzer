@@ -233,7 +233,7 @@ function formatAnalysisOutput_(
 
     tool.getRange(r, c0 + 3)
       .setFontWeight("bold")
-      .setNumberFormat("0.00")
+      .setNumberFormat("0.###")
       .setHorizontalAlignment("center");
   }
 

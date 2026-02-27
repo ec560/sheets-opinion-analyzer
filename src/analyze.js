@@ -335,8 +335,6 @@ function analyzeSelectedLevel() {
   const sdRow = out.findIndex(r => r[0] === "Standard Deviation");
   if (sdRow >= 0) tool.getRange(startRow + sdRow, startCol + 1).setNumberFormat("0.00").setHorizontalAlignment("left");
 
-  // This looked like a bug in your original: you search for "Outlier %", but your label is "Outliers".
-  // Keeping behavior unchanged would do nothing; leaving as-is but pointed out:
   const outRow = out.findIndex(r => r[0] === "Outlier %");
   if (outRow >= 0) {
     tool.getRange(startRow + outRow, startCol + 1).setNumberFormat("0.0%").setHorizontalAlignment("left");
