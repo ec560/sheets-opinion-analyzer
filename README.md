@@ -101,4 +101,4 @@ clasp push
 ## Using the sheet
 
 ### Example output
-<img width="1200" height="774" alt="image" src="https://github.com/user-attachments/assets/91aa483e-26b3-474f-b1fa-6cccd709663d" />
+<img width="1191" height="759" alt="image" src="https://github.com/user-attachments/assets/262b0181-b6f1-4881-8005-f34692e8e43f" />
