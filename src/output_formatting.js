@@ -39,7 +39,8 @@ function formatAnalysisOutput_(
   currentTier,
   verdictTier,
   verdictTierName,
-  totalWeightedOpinions
+  totalWeightedOpinions,
+  passesSplitPct
 ) {
   const r0 = OUTPUT_START_ROW;
   const c0 = OUTPUT_COL;
@@ -200,6 +201,8 @@ function formatAnalysisOutput_(
           msgCell.setValue("Needs more opinions");
         } else if (!passesSplitMajority) {
           msgCell.setValue("Split not decisive");
+        } else if (!passesSplitPct) {
+          msgCell.setValue("Low split margin");
         } else if (!verdictDiffersFromCurrent) {
           msgCell.setValue("No movement necessary");
           tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#efefef");

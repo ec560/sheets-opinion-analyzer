@@ -245,7 +245,15 @@ function analyzeSelectedLevel() {
   const verdictDiffersFromCurrent = verdictTier !== "" && verdictTier !== currentTierLower;
 
   const splitThreshold = isPending ? 3 : 4;
+  const splitMargin = Math.abs(splitLeftTotal - splitRightTotal);
+  const splitMarginPct = allWeight > 0 ? (splitMargin / allWeight) : 0;
+  const SPLIT_PCT_MIN_PENDING = 0.30;   // 30% of all weighted opinions
+  const SPLIT_PCT_MIN_MOVES   = 0.20;   // optional for non-pending moves
+
   const passesSplitMajority = Math.abs(splitLeftTotal - splitRightTotal) >= splitThreshold;
+  const passesSplitPct = isPending
+  ? (splitMarginPct >= SPLIT_PCT_MIN_PENDING)
+  : (splitMarginPct >= SPLIT_PCT_MIN_MOVES);
 
   // Output
   let out = [];
@@ -298,21 +306,31 @@ function analyzeSelectedLevel() {
   if (fuckPresent) {
     const fuckShare = (allWeight > 0 ? fuckWeight / allWeight : 0);
     if (((fuckShare >= 0.2 && toppct < 0.4) && verdictDiffersFromCurrent)
-      || (sd >= 2 && ((passesMajority || (topVsSecond && !isPending)) && passesSplitMajority && verdictDiffersFromCurrent))) {
+      || (sd >= 2 && ((passesMajority || (topVsSecond && !isPending)) &&
+        passesSplitMajority &&
+        passesSplitPct &&
+        verdictDiffersFromCurrent))) {
       canMove = true;
     }
   } else {
-    if ((passesMajority || (topVsSecond && !isPending)) && passesSplitMajority && verdictDiffersFromCurrent) {
+    if ((passesMajority || (topVsSecond && !isPending)) &&
+        passesSplitMajority &&
+        passesSplitPct &&
+        verdictDiffersFromCurrent) {
       canMove = true;
     }
   }
 
   out.push([`Place/Move`, canMove ? "YES" : "NO", "", canMove ? verdictTierName : ""]);
 
+  function upTo3dec_(x) {
+    return Number(x).toFixed(3).replace(/\.?0+$/, "");
+  }
+
   out.push([`Split`,
     `${splitLowTier}`,
     `${splitHighTier}`,
-    `${splitLeftTotal.toFixed(2)} | ${splitRightTotal.toFixed(2)}`
+    `${upTo3dec_(splitLeftTotal)} | ${upTo3dec_(splitRightTotal)}`
   ]);
 
   // Distribution dump
@@ -368,6 +386,7 @@ function analyzeSelectedLevel() {
     currentTier,
     verdictTier,
     verdictTierName,
-    allWeight
+    allWeight,
+    passesSplitPct
   );
 }
