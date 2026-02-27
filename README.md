@@ -4,21 +4,72 @@ Analyzes opinions from major opinion sheets and prints relevant statistics to as
 ## Setup
 
 After you fork the repository and clone it to your local system, navigate to the root folder
-On a linux-based system (or WSL), paste the following commands and follow the steps in order:
+### On Linux (or WSL):
 
-npm i -g @google/clasp (tested with version 3.2.0)
+```bash
+npm install -g @google/clasp
+```
+---
 
-clasp login - choose the google account associated with the sheet you will be using, and authenticate it to your account (use an alternative google account if necessary)
+### Authenticate
 
-Choose a unique script name, it does not matter what you call it specifically.
-To get your sheet ID, Copy the part between /d/ and /edit
-clasp create-script --title "<YOUR_SCRIPT_NAME>" --parentId <YOUR_SHEET_ID> - (it may print an error such as "User has not enabled the Apps Script API." If it does, enable that for the respective account and then run the command again)
+Choose the **Google account associated with the spreadsheet** you will use. If necessary, use an alternate Google account.
 
+```bash
+clasp login
+```
+Ensure you are only logged into the google account you want to use. Having multiple signed-in accounts may cause linking issues
+
+---
+
+### Get Your Spreadsheet ID
+
+Open your Google Sheet and copy the ID from the URL:
+
+```
+https://docs.google.com/spreadsheets/d/<YOUR_SHEET_ID>/edit
+```
+
+Copy the string of text between `/d/` and `/edit`.
+
+---
+
+### Create the Apps Script Project (Bound to the Sheet)
+
+Choose a unique script name (any name works).
+
+```bash
+clasp create-script --title "<YOUR_SCRIPT_NAME>" --parentId <YOUR_SHEET_ID>
+```
+
+If you see an error like:
+
+```
+"User has not enabled the Apps Script API."
+```
+
+Enable the Apps Script API for your account with the provided link, then run the command again.
+
+---
+
+### Push the code
+
+```bash
 clasp push
+```
+The files will now be available in the associated apps script dashboard to your sheet.
 
-Refresh your google sheet. You should see the "Tier Tools" button on the end.
-<img width="707" height="55" alt="image" src="https://github.com/user-attachments/assets/b0fdafca-0fc4-4884-80cf-ed9698763271" />
-Click the button to reveal more options, and then click "Setup" to trigger the Tier Analysis sheet creation.
+---
+
+### Activate in Google Sheets
+
+Refresh your Google Sheet; You should now see a new **"Tier Tools"** menu button at the top of the sheet.
+
+![Tier Tools Menu](https://github.com/user-attachments/assets/b0fdafca-0fc4-4884-80cf-ed9698763271)
+
+Pressing the "Setup" button from Tier Tools will create the **Tier Analysis** sheet.
+
+---
 
 ## Using the sheet
 
