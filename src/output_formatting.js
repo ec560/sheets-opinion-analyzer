@@ -201,7 +201,7 @@ function formatAnalysisOutput_(
           msgCell.setValue("Needs more opinions");
         } else if (!passesSplitMajority) {
           msgCell.setValue("Split not decisive");
-        } else if (!passesSplitPct) {
+        } else if (!passesSplitPct && verdictDiffersFromCurrent) {
           msgCell.setValue("Low split margin");
         } else if (!verdictDiffersFromCurrent) {
           msgCell.setValue("No movement necessary");
