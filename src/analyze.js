@@ -52,12 +52,22 @@ function analyzeSelectedLevel() {
     if (w <= 0) continue;
 
     // !!! Fuck tier opinion handling (supports 3-way splits) !!!
+    // - fuck opinions count normally toward tier math, but "fuck" itself is excluded from the calculation
+    // - Always: fuckPresent=true and fuckWeight += w
+    // - Allocate full weight to the tier/tiers implied by the text font colors
+    // - If no tier is implied treat as a fuck tier vote (full weight).
     if (opinionColor === "#000000") {
       fuckPresent = true;
       rawCount++;
 
       // Always count full Fuck weight for black opinions
       fuckWeight += w;
+
+      // Helper: adds tier weight contributions
+      const addTierWeight_ = (tier, wt) => {
+        if (!tier || wt <= 0) return;
+        weightsByTier[tier] = (weightsByTier[tier] || 0) + wt;
+      };
 
       // 3-way: black background & font is a split-color (ex: Insane/Extreme)
       const fontKey = hex_(opinionFont);
@@ -72,12 +82,12 @@ function analyzeSelectedLevel() {
           rawPoints.push((i1 + i2) / 2);
         }
 
+        // Count normally: total tier weight == w (50/50 split)
         if (lowTier && highTier) {
-          const halfW = w / 3;
-          weightsByTier[lowTier] = (weightsByTier[lowTier] || 0) + halfW;
-          weightsByTier[highTier] = (weightsByTier[highTier] || 0) + halfW;
-          fuckWeight -= halfW * 2;
-          totalWeight += halfW * 2;
+          const halfW = w / 2;
+          addTierWeight_(lowTier, halfW);
+          addTierWeight_(highTier, halfW);
+          totalWeight += w;
         }
         continue;
       }
@@ -85,31 +95,30 @@ function analyzeSelectedLevel() {
       // 2-way: black background & font is a real tier color (ex: Very Hard)
       const fontKey2 = hex_(opinionFont);
       const fontTier = difficultyColorNames[fontKey2]; // tier name if font matches a tier color
-
+      // If font indicates a tier, count FULL w for that tier (fuck is just a flag on top)
       if (fontTier && fontTier !== "Insane") {
         const it = tierIdxOf_(fontTier);
         if (it >= 0) rawPoints.push(it);
 
-        const halfW = w / 2;
-
-        fuckWeight -= halfW;
-        totalWeight += halfW;
-
-        weightsByTier[fontTier] = (weightsByTier[fontTier] || 0) + halfW;
+        addTierWeight_(fontTier, w);
+        totalWeight += w;
         continue;
       }
 
-      // 2-way special case: ONLY split Insane/Fuck if the text contains "insane"
+      // 2-way special case: ONLY treat as Insane if the text contains "insane"
       const hasInsane = String(opinionText).toLowerCase().includes("insane");
       if (hasInsane) {
         const it = tierIdxOf_("Insane");
         if (it >= 0) rawPoints.push(it);
 
-        const halfW = w / 2;
-        fuckWeight -= halfW;
-        totalWeight += halfW;
-        weightsByTier["Insane"] = (weightsByTier["Insane"] || 0) + halfW;
+        addTierWeight_("Insane", w);
+        totalWeight += w;
+        continue;
       }
+
+      // Otherwise: do nothing
+
+      totalWeight += w;
 
       continue;
     }
