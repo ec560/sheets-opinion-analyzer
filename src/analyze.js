@@ -63,7 +63,7 @@ function analyzeSelectedLevel() {
       // Always count full Fuck weight for black opinions
       fuckWeight += w;
 
-      // Helper: adds tier weight contributions
+      // Helper: add full-weight tier contributions and ensure totalWeight reflects normal values
       const addTierWeight_ = (tier, wt) => {
         if (!tier || wt <= 0) return;
         weightsByTier[tier] = (weightsByTier[tier] || 0) + wt;
@@ -174,7 +174,9 @@ function analyzeSelectedLevel() {
   const top = entries[0] || ["(none)", 0];
   const second = entries[1] || ["(none)", 0];
 
-  const allWeight = totalWeight + fuckWeight;
+  const tierWeightSum = orderedTierNames.reduce((s, t) => s + (weightsByTier[t] || 0), 0);
+  const allWeight = tierWeightSum;
+  const allAndFuck = allWeight + fuckWeight;
 
   const topTier = top[0];
   const topWeight = top[1];
@@ -241,7 +243,7 @@ function analyzeSelectedLevel() {
 
   let vtn = "";
   if (fuckPresent) {
-    if (((allWeight > 0 ? fuckWeight / allWeight : 0) >= 0.2 && toppct < 0.4) || (sd >= 2 && passesMajority)) {
+    if (((allWeight > 0 ? fuckWeight / (totalWeight || 1) : 0) >= 0.2 && toppct < 0.4) || (sd >= 2 && passesMajority)) {
       vtn = "fuck";
     } else {
       vtn = (splitLeftTotal > splitRightTotal) ? splitLowTier : splitHighTier;
@@ -268,7 +270,7 @@ function analyzeSelectedLevel() {
   let out = [];
   out.push([`Tier sheet`, tierName, "", ""]);
   out.push([`Level`, levelName, "", ""]);
-  out.push([`Total weighted opinions`, allWeight, "", ""]);
+  out.push([`Total weighted opinions`, allAndFuck, "", ""]);
   out.push([`Most votes (weighted)`, topTier, topWeight, ""]);
   out.push([`Runner-up (weighted)`, secondTier, secondWeight, ""]);
   out.push([`Tier Mean`, rawMeanLabel, rawMeanIdx, ""]);
@@ -284,12 +286,12 @@ function analyzeSelectedLevel() {
 
   if (fuckPresent) {
     out.push([`Fuck weight`, fuckWeight, "", ""]);
-    out.push([`Fuck % of all`, (allWeight) > 0 ? fuckWeight / (allWeight) : 0, "", ""]);
+    out.push([`Fuck % of all`, (allAndFuck) > 0 ? fuckWeight / (totalWeight || 1) : 0, "", ""]);
   }
 
   let verdictTierName = verdictTier;
   if (fuckPresent) {
-    if (((((allWeight) > 0 ? fuckWeight / (allWeight) : 0) >= 0.2) && toppct < 0.4)
+    if (((((allAndFuck) > 0 ? fuckWeight / (totalWeight || 1) : 0) >= 0.2) && toppct < 0.4)
       || (sd >= 2 && passesMajority)) {
       verdictTierName = "Fuck";
     }
@@ -313,7 +315,7 @@ function analyzeSelectedLevel() {
   let canMove = false;
 
   if (fuckPresent) {
-    const fuckShare = (allWeight > 0 ? fuckWeight / allWeight : 0);
+    const fuckShare = (allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0);
     if (((fuckShare >= 0.2 && toppct < 0.4) && verdictDiffersFromCurrent)
       || (sd >= 2 && ((passesMajority || (topVsSecond && !isPending)) &&
         passesSplitMajority &&
@@ -347,7 +349,7 @@ function analyzeSelectedLevel() {
   out.push(["Tier", "Weighted", "%", ""]);
   for (const t of orderedTierNames) {
     const w = weightsByTier[t] || 0;
-    const denom = allWeight > 0 ? allWeight : 1;
+    const denom = tierWeightSum > 0 ? tierWeightSum : 1;
     const share = w / denom;
     out.push([t, w, share, ""]);
   }
@@ -371,7 +373,7 @@ function analyzeSelectedLevel() {
   // Format share column as percent where applicable
   tool.getRange(startRow + 9, startCol + 2, Math.max(0, out.length - 9), 1).setNumberFormat("0.0%");
 
-  const fuckpct = allWeight > 0 ? fuckWeight / allWeight : 0;
+  const fuckpct = allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0;
 
   formatAnalysisOutput_(
     tool,
