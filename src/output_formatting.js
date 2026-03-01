@@ -185,9 +185,9 @@ function formatAnalysisOutput_(
       }
 
       if (fuckMode) {
-        if (isPending && !passesMajority) {
+        if ((isPending && !passesMajority) || totalWeightedOpinions < 5) {
           msgCell.setValue("Needs more opinions (F)");
-        } else if (!verdictDiffersFromCurrent) {
+        } else if (!verdictDiffersFromCurrent || fuckpct >= 0.5) {
           msgCell.setValue("No movement necessary (F)");
           tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#efefef");
         } else if (!passesSplitMajority && ruleB) {
