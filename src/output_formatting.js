@@ -172,7 +172,7 @@ function formatAnalysisOutput_(
       msgCell.setValue("");
 
       // Decide whether we are in "fuck mode"
-      let fuckMode = !!(fuckPresent && toppct < 0.4);
+      let fuckMode = !!(fuckPresent && (fuckpct >= 0.5 || toppct < 0.4));
 
       // In fuck mode, try the fuck triggers first.
       // If neither trigger is met, fall back to regular logic.

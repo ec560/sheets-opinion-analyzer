@@ -266,6 +266,8 @@ function analyzeSelectedLevel() {
   ? (splitMarginPct >= SPLIT_PCT_MIN_PENDING)
   : (splitMarginPct >= SPLIT_PCT_MIN_MOVES);
 
+  const fuckpct = allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0;
+
   // Output
   let out = [];
   out.push([`Tier sheet`, tierName, "", ""]);
@@ -291,7 +293,7 @@ function analyzeSelectedLevel() {
 
   let verdictTierName = verdictTier;
   if (fuckPresent) {
-    if (((((allAndFuck) > 0 ? fuckWeight / (totalWeight || 1) : 0) >= 0.2) && toppct < 0.4)
+    if (((fuckpct >= 0.2) || toppct < 0.4)
       || (sd >= 2 && passesMajority)) {
       verdictTierName = "Fuck";
     }
@@ -372,8 +374,6 @@ function analyzeSelectedLevel() {
 
   // Format share column as percent where applicable
   tool.getRange(startRow + 9, startCol + 2, Math.max(0, out.length - 9), 1).setNumberFormat("0.0%");
-
-  const fuckpct = allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0;
 
   formatAnalysisOutput_(
     tool,
