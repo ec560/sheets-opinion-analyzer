@@ -244,7 +244,7 @@ function analyzeSelectedLevel() {
   let vtn = "";
   if (fuckPresent) {
     if (((allWeight > 0 ? fuckWeight / (totalWeight || 1) : 0) >= 0.2 && toppct < 0.4) || (sd >= 2 && passesMajority)) {
-      vtn = "fuck";
+      vtn = "Fuck";
     } else {
       vtn = (splitLeftTotal > splitRightTotal) ? splitLowTier : splitHighTier;
     }
@@ -252,19 +252,17 @@ function analyzeSelectedLevel() {
     vtn = (splitLeftTotal > splitRightTotal) ? splitLowTier : splitHighTier;
   }
 
-  const verdictTier = String(vtn).trim().toLowerCase();
+  const verdictTier = String(vtn).trim();
   const verdictDiffersFromCurrent = verdictTier !== "" && verdictTier !== currentTierLower;
 
   const splitThreshold = isPending ? 3 : 4;
   const splitMargin = Math.abs(splitLeftTotal - splitRightTotal);
-  const splitMarginPct = allWeight > 0 ? (splitMargin / allWeight) : 0;
-  const SPLIT_PCT_MIN_PENDING = 0.30;   // 30% of all weighted opinions
-  const SPLIT_PCT_MIN_MOVES   = 0.20;   // optional for non-pending moves
+  const splitMarginPct = totalWeight > 0 ? (splitMargin / totalWeight) : 0;
+  const SPLIT_PCT_MIN_PENDING = 0.20;   // 60% side majority for pending
+  const SPLIT_PCT_MIN_MOVES   = 0.05;   // at least 50/50 for non-pending levels
 
   const passesSplitMajority = Math.abs(splitLeftTotal - splitRightTotal) >= splitThreshold;
-  const passesSplitPct = isPending
-  ? (splitMarginPct >= SPLIT_PCT_MIN_PENDING)
-  : (splitMarginPct >= SPLIT_PCT_MIN_MOVES);
+  const passesSplitPct = isPending ? (splitMarginPct >= SPLIT_PCT_MIN_PENDING): (splitMarginPct >= SPLIT_PCT_MIN_MOVES);
 
   const fuckpct = allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0;
 
@@ -319,7 +317,7 @@ function analyzeSelectedLevel() {
   if (fuckPresent) {
     const fuckShare = (allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0);
     if (((fuckShare >= 0.2 && toppct < 0.4) && verdictDiffersFromCurrent)
-      || (sd >= 2 && ((passesMajority || (topVsSecond && !isPending)) &&
+      || ((passesMajority || (topVsSecond && !isPending) &&
         passesSplitMajority &&
         passesSplitPct &&
         verdictDiffersFromCurrent))) {
@@ -398,6 +396,7 @@ function analyzeSelectedLevel() {
     verdictTier,
     verdictTierName,
     allWeight,
-    passesSplitPct
+    passesSplitPct,
+    splitMarginPct
   );
 }

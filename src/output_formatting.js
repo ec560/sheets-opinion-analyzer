@@ -40,7 +40,8 @@ function formatAnalysisOutput_(
   verdictTier,
   verdictTierName,
   totalWeightedOpinions,
-  passesSplitPct
+  passesSplitPct,
+  splitMarginPct
 ) {
   const r0 = OUTPUT_START_ROW;
   const c0 = OUTPUT_COL;
@@ -202,7 +203,8 @@ function formatAnalysisOutput_(
         } else if (!passesSplitMajority) {
           msgCell.setValue("Split not decisive");
         } else if (!passesSplitPct && verdictDiffersFromCurrent) {
-          msgCell.setValue("Low split margin");
+          msgCell.setValue("Low split margin (" + (splitMarginPct * 100).toFixed(2).replace(/\.?0+$/) + "%)");
+          tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#ffdfcc");
         } else if (!verdictDiffersFromCurrent) {
           msgCell.setValue("No movement necessary");
           tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#efefef");
