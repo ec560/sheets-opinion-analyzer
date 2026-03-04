@@ -240,10 +240,11 @@ function analyzeSelectedLevel() {
   const splitRightTotal = sumRange(splitHighIdx, orderedTierNames.length - 1);
 
   const toppct = allWeight > 0 ? topWeight / allWeight : 0;
+  const fuckpct = allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0;
 
   let vtn = "";
   if (fuckPresent) {
-    if (((allWeight > 0 ? fuckWeight / (totalWeight || 1) : 0) >= 0.2 && toppct < 0.4) || (sd >= 2 && passesMajority)) {
+    if ((((allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0) >= 0.2 && toppct < 0.4) || fuckpct >= 0.5) || (sd >= 2 && passesMajority)) {
       vtn = "Fuck";
     } else {
       vtn = (splitLeftTotal > splitRightTotal) ? splitLowTier : splitHighTier;
@@ -253,7 +254,7 @@ function analyzeSelectedLevel() {
   }
 
   const verdictTier = String(vtn).trim();
-  const verdictDiffersFromCurrent = verdictTier !== "" && verdictTier !== currentTierLower;
+  const verdictDiffersFromCurrent = verdictTier !== "" && verdictTier !== currentTier;
 
   const splitThreshold = isPending ? 3 : 4;
   const splitMargin = Math.abs(splitLeftTotal - splitRightTotal);
@@ -263,8 +264,6 @@ function analyzeSelectedLevel() {
 
   const passesSplitMajority = Math.abs(splitLeftTotal - splitRightTotal) >= splitThreshold;
   const passesSplitPct = isPending ? (splitMarginPct >= SPLIT_PCT_MIN_PENDING): (splitMarginPct >= SPLIT_PCT_MIN_MOVES);
-
-  const fuckpct = allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0;
 
   // Output
   let out = [];
@@ -291,8 +290,8 @@ function analyzeSelectedLevel() {
 
   let verdictTierName = verdictTier;
   if (fuckPresent) {
-    if (((fuckpct >= 0.2) || toppct < 0.4)
-      || (sd >= 2 && passesMajority)) {
+    if (((fuckpct >= 0.2) && toppct < 0.4)
+      || (sd >= 2 && passesMajority) || fuckpct >= 0.5) {
       verdictTierName = "Fuck";
     }
   } else {
@@ -316,11 +315,11 @@ function analyzeSelectedLevel() {
 
   if (fuckPresent) {
     const fuckShare = (allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0);
-    if (((fuckShare >= 0.2 && toppct < 0.4) && verdictDiffersFromCurrent)
-      || ((passesMajority || (topVsSecond && !isPending) &&
+    if ((((fuckShare >= 0.2 && toppct < 0.4) || fuckpct >= 0.5) && verdictDiffersFromCurrent)
+      || ((passesMajority || (topVsSecond && !isPending)) &&
         passesSplitMajority &&
         passesSplitPct &&
-        verdictDiffersFromCurrent))) {
+        verdictDiffersFromCurrent)) {
       canMove = true;
     }
   } else {
