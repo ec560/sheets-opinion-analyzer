@@ -1,6 +1,12 @@
 # sheets-opinion-analyzer
 Analyzes player opinions from google sheets and prints relevant statistics to assist with placement/movement of levels in their respective difficulty categories.
 
+[Setup](#setup)
+
+[Updating to Latest Version](#updating-to-latest-version)
+
+[Using the Sheet](#using-the-sheet)
+
 Credit to `Amberette/Cadrega` for inspiration and basic config structures.
 
 #### Note: The current version of the opinion analyzer is still undergoing practical testing, and may be incomplete/inaccurate at times.
