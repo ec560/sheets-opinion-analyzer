@@ -17,14 +17,10 @@ function pickSplitLowIdx_(orderedTierNames, weightsByTier, topIdx, runnerIdx, cu
 
   // Constrain split to include the current placed tier unless:
   // - is Pending
-  // OR
   // - placed tier is > 2 tiers away from the center (median)
-  const currentIsTopOrRunner = (currentIdx === topIdx || currentIdx === runnerIdx);
-
   const constrain =
     !isPending &&
     currentIdx >= 0 &&
-    currentIsTopOrRunner &&     // only anchor if current is top/runner-up
     Math.abs(currentIdx - centerIdx) <= 2;
 
   if (constrain) {

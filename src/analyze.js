@@ -293,6 +293,15 @@ function analyzeSelectedLevel() {
     if (((fuckpct >= 0.2) && toppct < 0.4)
       || (sd >= 2 && passesMajority) || fuckpct >= 0.5) {
       verdictTierName = "Fuck";
+    } else if (currentTier != "Fuck") {
+      const verdictIdx = (splitLeftTotal > splitRightTotal) ? splitLowIdx : splitHighIdx;
+      const verdictBaseName = orderedTierNames[verdictIdx];
+      let arrow = "";
+      if (currentIdx >= 0) {
+        if (verdictIdx < currentIdx) arrow = "↓    ";
+        else if (verdictIdx > currentIdx) arrow = "↑    ";
+      }
+      verdictTierName = arrow + verdictBaseName;
     }
   } else {
     const verdictIdx = (splitLeftTotal > splitRightTotal) ? splitLowIdx : splitHighIdx;
