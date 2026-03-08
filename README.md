@@ -17,7 +17,7 @@ This project uses `clasp` to sync changes between github and google apps script.
 
 
 After you fork the repository and clone it to your local system, navigate to the root folder
-### On Linux (or WSL):
+### On Mac, Linux, or WSL:
 
 ```bash
 npm install -g @google/clasp
