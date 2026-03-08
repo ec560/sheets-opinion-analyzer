@@ -3,6 +3,8 @@ Analyzes player opinions from google sheets and prints relevant statistics to as
 
 Credit to `Amberette/Cadrega` for inspiration and basic config structures.
 
+#### Note: The current version of the opinion analyzer is still undergoing practical testing, and may be incomplete/inaccurate at times.
+
 ## Setup
 
 This project uses `clasp` to sync changes between github and google apps script. Some linux terminal and git knowledge required.
