@@ -1,15 +1,47 @@
 # sheets-opinion-analyzer
 Analyzes player opinions from google sheets and prints relevant statistics to assist with placement/movement of levels in their respective difficulty categories.
 
+[Setup](#setup)
+
+[Updating to Latest Version](#updating-to-latest-version)
+
+[Using the Sheet](#using-the-sheet)
+
+#### Note: The current version of the opinion analyzer is still undergoing practical testing, and may be incomplete/inaccurate at times.
+
 Credit to `Amberette/Cadrega` for inspiration and basic config structures.
 
 ## Setup
 
 This project uses `clasp` to sync changes between github and google apps script. Some linux terminal and git knowledge required.
 
+### Forking (Optional)
 
-After you fork the repository and clone it to your local system, navigate to the root folder
-### On Linux (or WSL):
+Forking this repository is **optional**. You may want to fork if you plan to modify the analyzer code or maintain your own version of the project on GitHub.
+
+If you only plan to use the analyzer with your own Google Sheet, you can just clone the repository directly without forking.
+
+---
+
+### Clone the Repository
+
+Open a terminal and run:
+
+```bash
+git clone https://github.com/ec560/sheets-opinion-analyzer.git
+```
+
+Then navigate into the project folder:
+
+```bash
+cd sheets-opinion-analyzer
+```
+
+After cloning the repository and navigating to the root folder, continue with the following steps.
+
+---
+
+### On Mac, Linux, or WSL:
 
 ```bash
 npm install -g @google/clasp
@@ -54,6 +86,11 @@ If you see an error like:
 ```
 
 Enable the Apps Script API for your account with the provided link, then run the command again.
+
+**Important:** The create script will not work if you have an existing project connected to your spreadsheet. 
+You must first delete that project and migrate the contents to a safe folder, and then run the commands. 
+
+If you fork the repository, it is possible to combine the functionality of both of your scripts as long as your global variables do not conflict.
 
 ---
 
