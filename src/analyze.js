@@ -244,7 +244,7 @@ function analyzeSelectedLevel() {
 
   let vtn = "";
   if (fuckPresent) {
-    if ((((allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0) >= 0.2 && toppct < 0.4) || fuckpct >= 0.5) || (sd >= 2 && passesMajority)) {
+    if ((((allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0) >= 0.2 && toppct < 0.35) || fuckpct >= 0.5) || (sd >= 2 && passesMajority)) {
       vtn = "Fuck";
     } else {
       vtn = (splitLeftTotal > splitRightTotal) ? splitLowTier : splitHighTier;
