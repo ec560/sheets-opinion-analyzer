@@ -87,6 +87,11 @@ If you see an error like:
 
 Enable the Apps Script API for your account with the provided link, then run the command again.
 
+**Important:** The create script will not work if you have an existing project connected to your spreadsheet. 
+You must first delete that project and migrate the contents to a safe folder, and then run the commands. 
+
+If you fork the repository, it is possible to combine the functionality of both of your scripts as long as your global variables do not conflict.
+
 ---
 
 ### Push the code
