@@ -256,7 +256,16 @@ function analyzeSelectedLevel() {
   const verdictTier = String(vtn).trim();
   const verdictDiffersFromCurrent = verdictTier !== "" && verdictTier !== currentTier;
 
-  const splitThreshold = isPending ? 3 : 4;
+  let splitValue = "";
+  if (totalWeightedOpinions >= 50) {
+    splitValue = 4;
+  } else if (totalWeightedOpinions >= 100) {
+    splitValue = 5;
+  } else {
+    splitValue = 3;
+  }
+
+  const splitThreshold = splitValue; // minimum points difference needed to consider split as a majority
   const splitMargin = Math.abs(splitLeftTotal - splitRightTotal);
   const splitMarginPct = totalWeight > 0 ? (splitMargin / totalWeight) : 0;
   const SPLIT_PCT_MIN_PENDING = 0.20;   // 60% side majority for pending
