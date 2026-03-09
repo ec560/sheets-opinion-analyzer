@@ -257,9 +257,9 @@ function analyzeSelectedLevel() {
   const verdictDiffersFromCurrent = verdictTier !== "" && verdictTier !== currentTier;
 
   let splitValue = "";
-  if (totalWeightedOpinions >= 50) {
+  if (allWeight >= 50) {
     splitValue = 4;
-  } else if (totalWeightedOpinions >= 100) {
+  } else if (allWeight >= 100) {
     splitValue = 5;
   } else {
     splitValue = 3;
