@@ -205,7 +205,7 @@ function formatAnalysisOutput_(
         } else if (!passesSplitPct && verdictDiffersFromCurrent) {
           msgCell.setValue("Low split margin (" + (splitMarginPct * 100).toFixed(2).replace(/\.?0+$/) + "%)");
           tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#ffdfcc");
-        } else if (toppct >= 0.8 && totalWeightedOpinions >= 30) {
+        } else if (toppct >= 0.8 && totalWeightedOpinions >= 45) {
           msgCell.setValue("🔒 Lock threshold met");
           tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#e6f4ea");
         } else if (!verdictDiffersFromCurrent) {
