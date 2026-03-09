@@ -299,7 +299,7 @@ function analyzeSelectedLevel() {
 
   let verdictTierName = verdictTier;
   if (fuckPresent) {
-    if (((fuckpct >= 0.2) && toppct < 0.4)
+    if (((fuckpct >= 0.2) && toppct < 0.35)
       || (sd >= 2 && passesMajority) || fuckpct >= 0.5) {
       verdictTierName = "Fuck";
     } else if (currentTier != "Fuck") {
@@ -333,7 +333,7 @@ function analyzeSelectedLevel() {
 
   if (fuckPresent) {
     const fuckShare = (allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0);
-    if ((((fuckShare >= 0.2 && toppct < 0.4) || fuckpct >= 0.5) && verdictDiffersFromCurrent)
+    if ((((fuckShare >= 0.2 && toppct < 0.35) || fuckpct >= 0.5) && verdictDiffersFromCurrent)
       || ((passesMajority || (topVsSecond && !isPending)) &&
         passesSplitMajority &&
         passesSplitPct &&
