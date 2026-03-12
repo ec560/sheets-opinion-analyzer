@@ -3,6 +3,8 @@ function analyzeSelectedLevel() {
   const ss = SpreadsheetApp.getActive();
   const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
 
+  tool.getRange(OUTPUT_START_ROW, OUTPUT_COL, tool.getMaxRows(), OUTPUT_WIDTH).clearContent().breakApart();
+
   const tierName = tool.getRange(TIER_CELL).getDisplayValue().trim();
   const levelName = tool.getRange(LEVEL_CELL).getDisplayValue().trim();
   if (!tierName || !levelName) {

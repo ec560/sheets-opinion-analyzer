@@ -61,4 +61,6 @@ function populateSelectedLevel() {
   dest.setValues(outVals);
   dest.setBackgrounds(outBgs);
   dest.setFontColors(outFcs);
+
+  renderAnalysisStatus_(tool);
 }

@@ -32,6 +32,7 @@ function setupTierAnalysis() {
   sh.setFrozenRows(3);
 
   formatAnalysisSheetLayout_(sh);
+  renderAnalysisStatus_(sh);
 }
 
 // format the analysis sheet with column widths, fonts, colors, etc

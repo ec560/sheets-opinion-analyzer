@@ -10,6 +10,7 @@ function onEdit(e) {
     refreshLevelDropdown_();
     // also clear pasted data/output whenever tier changes
     clearAnalysisArea_();
+    renderAnalysisStatus_(sh);
   }
 
   if (a1 === LEVEL_CELL) {

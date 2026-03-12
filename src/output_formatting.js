@@ -314,3 +314,57 @@ function formatAnalysisOutput_(
       .setHorizontalAlignment("left");
   }
 }
+
+function renderAnalysisStatus_(tool) {
+  const r0 = OUTPUT_START_ROW;
+  const c0 = OUTPUT_COL;
+
+  // If analysis output already exists, do nothing
+  const firstLabel = String(tool.getRange(r0, c0).getDisplayValue() || "").trim();
+  if (firstLabel === "Tier sheet") {
+    return;
+  }
+
+  tool.getRange(r0, c0, tool.getMaxRows(), OUTPUT_WIDTH)
+    .clearContent();
+
+  const tierName = String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim();
+  const levelName = String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim();
+
+  // Check opinions directly from A:C
+  const vals = tool
+    .getRange(DATA_START_ROW, 1, tool.getMaxRows() - DATA_START_ROW + 1, 3)
+    .getDisplayValues();
+
+  let hasOpinions = false;
+
+  for (const r of vals) {
+    if (String(r[0]).trim() || String(r[1]).trim() || String(r[2]).trim()) {
+      hasOpinions = true;
+      break;
+    }
+  }
+
+  let message = "";
+  let bg = "#fce8e6";
+
+  if (!tierName) {
+    message = "Select a tier sheet";
+  } else if (!levelName) {
+    message = "Select a level";
+    bg = "#fff4cc";
+  } else if (!hasOpinions) {
+    message = "No opinions loaded";
+  } else {
+    message = "Tier Tools -> Analyze Selected Level";
+    bg = "#e6f4ea";
+  }
+
+  tool.getRange(r0, c0, 1, OUTPUT_WIDTH)
+    .setValues([[message, "", "", ""]])
+    .mergeAcross()
+    .setBackground(bg)
+    .setFontFamily("Mukta")
+    .setFontWeight("bold")
+    .setHorizontalAlignment("center");
+}
