@@ -8,6 +8,10 @@ function onEdit(e) {
   const a1 = range.getA1Notation();
   if (a1 === TIER_CELL) {
     refreshLevelDropdown_();
+
+    // tier change invalidates the previously selected level
+    sh.getRange(LEVEL_CELL).clearContent();
+
     // also clear pasted data/output whenever tier changes
     clearAnalysisArea_();
     renderAnalysisStatus_(sh);
