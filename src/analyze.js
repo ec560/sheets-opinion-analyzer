@@ -280,7 +280,7 @@ function analyzeSelectedLevel() {
   let out = [];
   out.push([`Tier sheet`, tierName, "", ""]);
   out.push([`Level`, levelName, "", ""]);
-  out.push([`Total weighted opinions`, allAndFuck, "", ""]);
+  out.push([`Total weighted opinions`, allAndFuck, "", VERSION]);
   out.push([`Most votes (weighted)`, topTier, topWeight, ""]);
   out.push([`Runner-up (weighted)`, secondTier, secondWeight, ""]);
   out.push([`Tier Mean`, rawMeanLabel, rawMeanIdx, ""]);

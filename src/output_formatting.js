@@ -94,6 +94,14 @@ function formatAnalysisOutput_(
       .setFontWeight("bold")
       .setBorder(true, true, true, true, false, false, "#dadce0", SpreadsheetApp.BorderStyle.SOLID);
     tool.getRange(r, c0).setBackground(null); // keep label cell neutral
+
+    const versionCell = tool.getRange(r + 2, c0 + 3, 1, 1); // H
+    versionCell
+      .setFontSize(10)
+      .setFontColor("#9e9e9e")
+      .setFontWeight("normal")
+      .setHorizontalAlignment("right")
+      .setVerticalAlignment("middle");
   }
 
   // Level Header formatting
@@ -115,7 +123,6 @@ function formatAnalysisOutput_(
   const styleMetricRow = (r, bg) => {
     tool.getRange(r, c0, 1, OUTPUT_WIDTH)
       .setBackground(bg)
-      .setBorder(false, false, false, false, false, false);
 
     tool.getRange(r, c0 + 1).setHorizontalAlignment("left");  // tier/text (F)
     tool.getRange(r, c0 + 2, 1, 2).setHorizontalAlignment("right"); // numbers (G:H)
@@ -127,8 +134,6 @@ function formatAnalysisOutput_(
     const r = r0 + idxTotal;
     styleMetricRow(r, "#ffffff");
     tool.getRange(r, c0 + 1).setFontWeight("bold"); // the total value
-    tool.getRange(r, c0, 1, OUTPUT_WIDTH)
-      .setBorder(false, false, true, false, false, false, "#dadce0", SpreadsheetApp.BorderStyle.SOLID); // thin bottom rule
   }
 
   if (idxMost >= 0) styleMetricRow(r0 + idxMost, "#ffffff");
