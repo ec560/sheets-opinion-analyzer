@@ -300,13 +300,14 @@ function analyzeSelectedLevel() {
   }
 
   let verdictTierName = verdictTier;
+  const verdictIdx = (splitLeftTotal > splitRightTotal) ? splitLowIdx : splitHighIdx;
+  const verdictBaseName = orderedTierNames[verdictIdx];
+
   if (fuckPresent) {
     if (((fuckpct >= 0.2) && toppct < 0.35)
       || (sd >= 2 && passesMajority) || fuckpct >= 0.5) {
       verdictTierName = "Fuck";
     } else if (currentTier != "Fuck") {
-      const verdictIdx = (splitLeftTotal > splitRightTotal) ? splitLowIdx : splitHighIdx;
-      const verdictBaseName = orderedTierNames[verdictIdx];
       let arrow = "";
       if (currentIdx >= 0) {
         if (verdictIdx < currentIdx) arrow = "↓    ";
@@ -315,9 +316,6 @@ function analyzeSelectedLevel() {
       verdictTierName = arrow + verdictBaseName;
     }
   } else {
-    const verdictIdx = (splitLeftTotal > splitRightTotal) ? splitLowIdx : splitHighIdx;
-    const verdictBaseName = orderedTierNames[verdictIdx];
-
     if (isPending) {
       verdictTierName = verdictBaseName;
     } else {
@@ -398,6 +396,7 @@ function analyzeSelectedLevel() {
     orderedTierNames,
     weightsByTier,
     topTier,
+    topWeight,
     secondTier,
     splitLowTier,
     splitHighTier,
@@ -414,8 +413,11 @@ function analyzeSelectedLevel() {
     currentTier,
     verdictTier,
     verdictTierName,
+    verdictBaseName,
     allWeight,
     passesSplitPct,
-    splitMarginPct
+    splitMarginPct,
+    splitMargin,
+    splitThreshold
   );
 }

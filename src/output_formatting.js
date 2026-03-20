@@ -23,6 +23,7 @@ function formatAnalysisOutput_(
   orderedTierNames,
   weightsByTier,
   topTier,
+  topWeight,
   runnerTier,
   splitLowTier,
   splitHighTier,
@@ -39,9 +40,12 @@ function formatAnalysisOutput_(
   currentTier,
   verdictTier,
   verdictTierName,
+  verdictBaseName,
   totalWeightedOpinions,
   passesSplitPct,
-  splitMarginPct
+  splitMarginPct,
+  splitMargin,
+  splitThreshold
 ) {
   const r0 = OUTPUT_START_ROW;
   const c0 = OUTPUT_COL;
@@ -198,12 +202,22 @@ function formatAnalysisOutput_(
         }
       } else {
         // Regular logic
-        if ((isPending && !passesMajority) || (totalWeightedOpinions < 5 || !passesMajority)) {
-          msgCell.setValue("Needs more opinions");
-        } else if (!passesSplitMajority) {
-          msgCell.setValue("Split not decisive");
+          if (!passesSplitMajority) {
+            Logger.log(JSON.stringify(verdictBaseName));
+            msgCell.setValue("Split not decisive (+" + splitMargin.toFixed(2).replace(/\.?0+$/, "") + " " + verdictBaseName.toLowerCase() + ")");
+         } else if (isPending && !passesMajority) {
+          if (topWeight >= 3) {
+            tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#ffdfcc");
+          }
+          msgCell.setValue("Needs more opinions (" + topWeight + "/4)");
+        } else if (totalWeightedOpinions < 5 || !passesMajority) {
+          msgCell.setValue("Needs more opinions (" + totalWeightedOpinions.toFixed(2).replace(/\.?0+$/, "") + " total)");
         } else if (!passesSplitPct && verdictDiffersFromCurrent) {
-          msgCell.setValue("Low split margin (" + (splitMarginPct * 100).toFixed(2).replace(/\.?0+$/) + "%)");
+          msgCell.setValue("Low split margin (" +
+            (splitMarginPct * 100).toFixed(2).replace(/\.?0+$/, "") +
+            "% ; " +
+            ((isPending ? 0.20 : 0.05) * 100).toFixed(0) +
+            "% required)");
           tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#ffdfcc");
         } else if (toppct >= 0.75 && totalWeightedOpinions >= 45) {
           msgCell.setValue("🔒 Lock threshold met");
@@ -212,7 +226,7 @@ function formatAnalysisOutput_(
           msgCell.setValue("No movement necessary");
           tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#efefef");
         } else {
-          msgCell.setValue("Rules not met");
+          msgCell.setValue("Rules not met (please tell opayc)");
         }
       }
     }

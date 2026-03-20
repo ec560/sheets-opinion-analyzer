@@ -46,7 +46,7 @@ function formatAnalysisSheetLayout_(sh) {
   sh.setColumnWidths(4, 1, 18);  // D spacer
   sh.setColumnWidths(5, 1, 150); // E output
   sh.setColumnWidths(6, 2, 110); // F:G output
-  sh.setColumnWidths(8, 1, 100); // H spark
+  sh.setColumnWidths(8, 1, 125); // H spark
 
   // Inputs
   sh.getRange("A1:A2")
@@ -77,4 +77,16 @@ function formatAnalysisSheetLayout_(sh) {
 
   sh.getRange("D1:D200")
     .setBorder(false, true, false, false, false, false, "#666666", SpreadsheetApp.BorderStyle.SOLID_THICK);
+
+  const splitRow = 12;
+
+  sh.getRange(splitRow, 1, 1, 8)
+    .setVerticalAlignment("middle");
+
+  // Target ONLY the numbers cell (column H)
+  sh.getRange(splitRow, 8)
+    .setFontSize(11)
+    .setFontWeight("bold")
+    .setHorizontalAlignment("center")
+    .setVerticalAlignment("middle");
 }
