@@ -219,7 +219,7 @@ function formatAnalysisOutput_(
           msgCell.setValue("Needs more opinions (" + totalWeightedOpinions.toFixed(2).replace(/\.?0+$/, "") + " total)");
         } else if (!passesSplitPct && verdictDiffersFromCurrent) {
           msgCell.setValue("Low split margin (" +
-            (splitMarginPct * 100).toFixed(2).replace(/\.?0+$/, "") +
+            (splitMarginPct * 100).toFixed(0) +
             "% ; " +
             ((isPending ? 0.20 : 0.05) * 100).toFixed(0) +
             "% required)");
