@@ -243,25 +243,31 @@ function formatAnalysisOutput_(
     const nameToColor = buildTierNameToColor_();
 
     tool.getRange(r, c0, 1, OUTPUT_WIDTH)
-      .setBackground("#fff4cc");
+      .setBackground("#fff4cc")
+      .setVerticalAlignment("middle");
 
     if (nameToColor[splitLowTier]) {
       tool.getRange(r, c0 + 1)
         .setBackground(nameToColor[splitLowTier])
         .setFontColor(tierTextColor_(splitLowTier))
-        .setHorizontalAlignment("right");
+        .setHorizontalAlignment("right")
+        .setVerticalAlignment("middle");
     }
+
     if (nameToColor[splitHighTier]) {
       tool.getRange(r, c0 + 2)
         .setBackground(nameToColor[splitHighTier])
         .setFontColor(tierTextColor_(splitHighTier))
-        .setHorizontalAlignment("left");
+        .setHorizontalAlignment("left")
+        .setVerticalAlignment("middle");
     }
 
     tool.getRange(r, c0 + 3)
+      .setFontSize(11)
       .setFontWeight("bold")
       .setNumberFormat("0.###")
-      .setHorizontalAlignment("center");
+      .setHorizontalAlignment("center")
+      .setVerticalAlignment("middle");
   }
 
   // Distribution table

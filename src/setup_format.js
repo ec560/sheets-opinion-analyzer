@@ -77,16 +77,4 @@ function formatAnalysisSheetLayout_(sh) {
 
   sh.getRange("D1:D200")
     .setBorder(false, true, false, false, false, false, "#666666", SpreadsheetApp.BorderStyle.SOLID_THICK);
-
-  const splitRow = 12;
-
-  sh.getRange(splitRow, 1, 1, 8)
-    .setVerticalAlignment("middle");
-
-  // Target ONLY the numbers cell (column H)
-  sh.getRange(splitRow, 8)
-    .setFontSize(11)
-    .setFontWeight("bold")
-    .setHorizontalAlignment("center")
-    .setVerticalAlignment("middle");
 }
