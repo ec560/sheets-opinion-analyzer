@@ -208,7 +208,6 @@ function formatAnalysisOutput_(
       } else {
         // Regular logic
           if (!passesSplitMajority) {
-            Logger.log(JSON.stringify(verdictBaseName));
             msgCell.setValue("Split not decisive (+" + splitMargin.toFixed(2).replace(/\.?0+$/, "") + " " + verdictBaseName.toLowerCase() + ")");
          } else if (isPending && !passesMajority) {
           if (topWeight >= 3) {
