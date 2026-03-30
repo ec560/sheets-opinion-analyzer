@@ -259,7 +259,7 @@ function analyzeSelectedLevel() {
   const verdictDiffersFromCurrent = verdictTier !== "" && verdictTier !== currentTier;
 
   let splitValue = "";
-  if (allWeight >= 50) {
+  if (allWeight >= 50 && allWeight < 100) {
     splitValue = 4;
   } else if (allWeight >= 100) {
     splitValue = 5;
