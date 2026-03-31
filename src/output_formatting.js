@@ -119,6 +119,13 @@ function formatAnalysisOutput_(
   const idxTotal = labels.findIndex(v => String(v).trim() === "Total weighted opinions");
   const idxMost  = labels.findIndex(v => String(v).trim() === "Most votes (weighted)");
   const idxRun   = labels.findIndex(v => String(v).trim() === "Runner-up (weighted)");
+  const idxMean = labels.findIndex(v => String(v).trim() === "Tier Mean");
+  const idxMedian = labels.findIndex(v => String(v).trim() === "Tier Median");
+  const idxOutliers = labels.findIndex(v => String(v).trim() === "Outliers");
+  const idxOutlierRange = labels.findIndex(v => String(v).trim() === "Outlier range");
+  const idxSd = labels.findIndex(v => String(v).trim() === "Standard Deviation");
+  const idxFuckWeight = labels.findIndex(v => String(v).trim() === "Fuck weight");
+  const idxFuckPct = labels.findIndex(v => String(v).trim() === "Fuck % of all");
 
   const styleMetricRow = (r, bg) => {
     tool.getRange(r, c0, 1, OUTPUT_WIDTH)
@@ -138,6 +145,17 @@ function formatAnalysisOutput_(
 
   if (idxMost >= 0) styleMetricRow(r0 + idxMost, "#ffffff");
   if (idxRun  >= 0) styleMetricRow(r0 + idxRun,  "#ffffff");
+
+  [idxMean, idxMedian, idxOutliers, idxOutlierRange, idxSd, idxFuckWeight, idxFuckPct].forEach(idx => {
+    if (idx < 0) return;
+
+    tool.getRange(r0 + idx, c0, 1, OUTPUT_WIDTH)
+      .setBackground("#fafafa")
+      .setFontColor("#6f6f6f");
+
+    tool.getRange(r0 + idx, c0)
+      .setFontWeight("normal");
+  });
 
   tool.getRange(r0 + idxMost, c0 + 2)
     .setNumberFormat("0.###")
