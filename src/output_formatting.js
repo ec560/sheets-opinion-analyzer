@@ -357,6 +357,22 @@ function formatAnalysisOutput_(
   }
 }
 
+function setAnalysisStatusMessage_(tool, message, bg) {
+  const r0 = OUTPUT_START_ROW;
+  const c0 = OUTPUT_COL;
+
+  tool.getRange(r0, c0, 1, OUTPUT_WIDTH).breakApart();
+  tool.getRange(r0, c0, tool.getMaxRows(), OUTPUT_WIDTH).clearContent();
+
+  tool.getRange(r0, c0, 1, OUTPUT_WIDTH)
+    .setValues([[message, "", "", ""]])
+    .mergeAcross()
+    .setBackground(bg || "#fce8e6")
+    .setFontFamily("Mukta")
+    .setFontWeight("bold")
+    .setHorizontalAlignment("center");
+}
+
 function renderAnalysisStatus_(tool) {
   const r0 = OUTPUT_START_ROW;
   const c0 = OUTPUT_COL;
@@ -398,15 +414,9 @@ function renderAnalysisStatus_(tool) {
   } else if (!hasOpinions) {
     message = "No opinions loaded";
   } else {
-    message = "Tier Tools -> Analyze Selected Level";
-    bg = "#e6f4ea";
+    message = "Loading..";
+    bg = "#e8f0fe";
   }
 
-  tool.getRange(r0, c0, 1, OUTPUT_WIDTH)
-    .setValues([[message, "", "", ""]])
-    .mergeAcross()
-    .setBackground(bg)
-    .setFontFamily("Mukta")
-    .setFontWeight("bold")
-    .setHorizontalAlignment("center");
+  setAnalysisStatusMessage_(tool, message, bg);
 }

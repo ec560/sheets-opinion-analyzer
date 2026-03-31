@@ -16,21 +16,35 @@ function populateSelectedLevel() {
 
   const tierName = tool.getRange(TIER_CELL).getDisplayValue().trim();
   const levelName = tool.getRange(LEVEL_CELL).getDisplayValue().trim();
-  if (!tierName || !levelName) return;
+  if (!tierName || !levelName) {
+    renderAnalysisStatus_(tool);
+    return false;
+  }
+
+  setAnalysisStatusMessage_(tool, "Loading..", "#e8f0fe");
 
   const tierSheet = ss.getSheetByName(tierName);
-  if (!tierSheet) return;
+  if (!tierSheet) {
+    setAnalysisStatusMessage_(tool, "Failed to load opinions", "#fce8e6");
+    return false;
+  }
 
   const headers = getLevelHeaders_(tierSheet);
   const header = headers.find(h => h.name === levelName);
-  if (!header) return;
+  if (!header) {
+    setAnalysisStatusMessage_(tool, "Failed to load opinions", "#fce8e6");
+    return false;
+  }
 
   const startCol = header.col;
   const numCols = 3; // player/opinion/reliability
   const lastRow = tierSheet.getLastRow();
   const numRows = Math.max(0, lastRow - 1);
 
-  if (numRows === 0) return;
+  if (numRows === 0) {
+    setAnalysisStatusMessage_(tool, "Failed: no opinions found", "#fce8e6");
+    return false;
+  }
 
   const srcRange = tierSheet.getRange(2, startCol, numRows, numCols);
   const vals = srcRange.getValues();
@@ -55,12 +69,21 @@ function populateSelectedLevel() {
     outFcs.push(fcs[r]);
   }
 
-  if (outVals.length === 0) return;
+  if (outVals.length === 0) {
+    setAnalysisStatusMessage_(tool, "Failed: no opinions found", "#fce8e6");
+    return false;
+  }
 
   const dest = tool.getRange(DATA_START_ROW, 1, outVals.length, 3);
   dest.setValues(outVals);
   dest.setBackgrounds(outBgs);
   dest.setFontColors(outFcs);
 
-  renderAnalysisStatus_(tool);
+  try {
+    analyzeSelectedLevel();
+    return true;
+  } catch (e) {
+    setAnalysisStatusMessage_(tool, "Failed to analyze opinions", "#fce8e6");
+    return false;
+  }
 }
