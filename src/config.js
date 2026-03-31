@@ -1,7 +1,7 @@
 // global constants for sheet names, cell locations, and color mappings
 
 const ANALYSIS_SHEET_NAME = "Tier Analysis";
-const VERSION = "v1.2.3";
+const VERSION = "v1.3";
 const TIER_CELL = "B1";
 const LEVEL_CELL = "B2";
 const DATA_START_ROW = 4;                      // where A:C gets populated
