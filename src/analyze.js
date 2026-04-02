@@ -294,11 +294,6 @@ function analyzeSelectedLevel() {
   ]);
   out.push([`Standard Deviation`, sd, "", ""]);
 
-  if (fuckPresent) {
-    out.push([`Fuck weight`, fuckWeight, "", ""]);
-    out.push([`Fuck % of all`, (allAndFuck) > 0 ? fuckWeight / (totalWeight || 1) : 0, "", ""]);
-  }
-
   let verdictTierName = verdictTier;
   const verdictIdx = (splitLeftTotal > splitRightTotal) ? splitLowIdx : splitHighIdx;
   const verdictBaseName = orderedTierNames[verdictIdx];
@@ -363,6 +358,11 @@ function analyzeSelectedLevel() {
 
   // Distribution dump
   out.push(["", "", "", ""]);
+  if (fuckPresent) {
+    out.push(["Fuck % of all", "", "", ""]);
+    out.push(["Fuck", fuckWeight, fuckpct, ""]);
+    out.push(["", "", "", ""]);
+  }
   out.push(["Tier", "Weighted", "%", ""]);
   for (const t of orderedTierNames) {
     const w = weightsByTier[t] || 0;

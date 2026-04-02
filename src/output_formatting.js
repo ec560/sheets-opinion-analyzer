@@ -78,7 +78,8 @@ function formatAnalysisOutput_(
 
   const meetsRow = labels.findIndex(v => v === "Place/Move");
   const splitRow = labels.findIndex(v => v === "Split");
-  const distHeader = labels.findIndex(v => v === "Tier");
+  const signalHeader = labels.findIndex(v => String(v).trim() === "Fuck % of all");
+  const distHeader = labels.findIndex(v => String(v).trim() === "Tier");
 
   // Header rows
   const tierRow = labels.findIndex(v => String(v).trim() === "Tier sheet");
@@ -124,8 +125,7 @@ function formatAnalysisOutput_(
   const idxOutliers = labels.findIndex(v => String(v).trim() === "Outliers");
   const idxOutlierRange = labels.findIndex(v => String(v).trim() === "Outlier range");
   const idxSd = labels.findIndex(v => String(v).trim() === "Standard Deviation");
-  const idxFuckWeight = labels.findIndex(v => String(v).trim() === "Fuck weight");
-  const idxFuckPct = labels.findIndex(v => String(v).trim() === "Fuck % of all");
+  const idxFuckSignal = labels.findIndex(v => String(v).trim() === "Fuck");
 
   const styleMetricRow = (r, bg) => {
     tool.getRange(r, c0, 1, OUTPUT_WIDTH)
@@ -146,7 +146,7 @@ function formatAnalysisOutput_(
   if (idxMost >= 0) styleMetricRow(r0 + idxMost, "#ffffff");
   if (idxRun  >= 0) styleMetricRow(r0 + idxRun,  "#ffffff");
 
-  [idxMean, idxMedian, idxOutliers, idxOutlierRange, idxSd, idxFuckWeight, idxFuckPct].forEach(idx => {
+  [idxMean, idxMedian, idxOutliers, idxOutlierRange, idxSd].forEach(idx => {
     if (idx < 0) return;
 
     tool.getRange(r0 + idx, c0, 1, OUTPUT_WIDTH)
@@ -225,13 +225,13 @@ function formatAnalysisOutput_(
         }
       } else {
         // Regular logic
-          if (!passesSplitMajority) {
-            msgCell.setValue("Split not decisive (+" + splitMargin.toFixed(2).replace(/\.?0+$/, "") + " " + verdictBaseName.toLowerCase() + ")");
-         } else if (isPending && !passesMajority) {
+        if (isPending && !passesMajority) {
           if (topWeight >= 3) {
             tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#ffdfcc");
           }
           msgCell.setValue("Needs more opinions (" + topWeight + "/4)");
+        } else if (!passesSplitMajority) {
+            msgCell.setValue("Split not decisive (+" + splitMargin.toFixed(2).replace(/\.?0+$/, "") + " " + verdictBaseName.toLowerCase() + ")");
         } else if (totalWeightedOpinions < 5 || !passesMajority) {
           msgCell.setValue("Needs more opinions (" + totalWeightedOpinions.toFixed(2).replace(/\.?0+$/, "") + " total)");
         } else if (!passesSplitPct && verdictDiffersFromCurrent) {
@@ -287,10 +287,20 @@ function formatAnalysisOutput_(
       .setVerticalAlignment("middle");
   }
 
+  if (signalHeader >= 0) {
+    const signalHeaderRow = r0 + signalHeader;
+    tool.getRange(signalHeaderRow, c0, 1, OUTPUT_WIDTH)
+      .setBackground("#f1f3f4")
+      .setFontWeight("bold")
+      .setFontColor("#5f6368")
+      .setBorder(true, false, true, false, false, false, "#d6d9dc", SpreadsheetApp.BorderStyle.SOLID);
+  }
+
   // Distribution table
   if (distHeader >= 0) {
     const headerRow = r0 + distHeader;
     const firstData = headerRow + 1;
+    const lastDataRow = firstData + orderedTierNames.length - 1;
 
     // Header row subtle
     tool.getRange(headerRow, c0, 1, OUTPUT_WIDTH)
@@ -298,6 +308,40 @@ function formatAnalysisOutput_(
       .setFontWeight("bold");
 
     const nameToColor = buildTierNameToColor_();
+
+    if (idxFuckSignal >= 0) {
+      const fuckRow = r0 + idxFuckSignal;
+      const sparkCol = c0 + 3; // H
+      const sparkCell = tool.getRange(fuckRow, sparkCol);
+      const fuckIsBackground = fuckpct < 0.15;
+
+      tool.getRange(fuckRow, c0, 1, OUTPUT_WIDTH)
+        .setBackground("#f5f5f5")
+        .setBorder(true, false, true, false, false, false, "#d0d0d0", SpreadsheetApp.BorderStyle.DASHED);
+
+      tool.getRange(fuckRow, c0)
+        .setBackground(fuckIsBackground ? "#d9d9d9" : "#000000")
+        .setFontColor(fuckIsBackground ? "#7a7a7a" : "#ff0000")
+        .setFontWeight(fuckIsBackground ? "normal" : "bold");
+
+      tool.getRange(fuckRow, c0 + 1)
+        .setFontWeight(fuckIsBackground ? "normal" : "bold")
+        .setFontColor(fuckIsBackground ? "#8a8a8a" : "#000000")
+        .setHorizontalAlignment("right");
+
+      tool.getRange(fuckRow, c0 + 2)
+        .setFontWeight(fuckIsBackground ? "normal" : "bold")
+        .setFontColor(fuckIsBackground ? "#8a8a8a" : "#b71c1c")
+        .setHorizontalAlignment("right");
+
+      sparkCell
+        .setBackground("#f5f5f5");
+
+      sparkCell.setFormulaR1C1(
+        `=SPARKLINE({RC[-1],1-RC[-1]},` +
+        `{"charttype","bar";"color1","${fuckIsBackground ? "#9e9e9e" : "#000000"}";"color2","#f5f5f5";"max",1})`
+      );
+    }
 
     for (let i = 0; i < orderedTierNames.length; i++) {
       const row = firstData + i;
@@ -320,14 +364,25 @@ function formatAnalysisOutput_(
       const sparkCol = c0 + 3; // H
       const sparkCell = tool.getRange(row, sparkCol);
       const color1 = nameToColor[tier] || "#999999";
-
-      const firstDataRow = firstData;
-      const lastDataRow  = firstData + orderedTierNames.length - 1;
+      const fullWidthAt = 45;
+      const minScale = 0.2;
+      const confidenceScale = Math.min(
+        minScale + (1 - minScale) * (totalWeightedOpinions / fullWidthAt),
+        1
+      );
 
       sparkCell.setFormulaR1C1(
-        `=SPARKLINE({RC[-1]/MAX(R${firstDataRow}C[-1]:R${lastDataRow}C[-1]),1},` +
+        `=SPARKLINE({(RC[-1]/MAX(R${firstData}C[-1]:R${lastDataRow}C[-1]))*${confidenceScale},1},` +
         `{"charttype","bar";"color1","${color1}";"color2","white";"max",1})`
       );
+
+      // old sparkline
+      /*
+      sparkCell.setFormulaR1C1(
+        `=SPARKLINE({RC[-1]/MAX(R${firstData}C[-1]:R${lastDataRow}C[-1]),1},` +
+        `{"charttype","bar";"color1","${color1}";"color2","white";"max",1})`
+      );
+      */
     }
 
     // Emphasize top + runner only
@@ -345,15 +400,13 @@ function formatAnalysisOutput_(
     }
   }
 
-  if (fuckPresent) {
-    tool.getRange(r0 + 10, c0, 1, OUTPUT_WIDTH)
-      .setBorder(true, false, false, false, false, false, "#999999", SpreadsheetApp.BorderStyle.DASHED);
-    tool.getRange(r0 + 10, c0 + 1, 1, 1)
-      .setHorizontalAlignment("left")
+  if (idxFuckSignal >= 0) {
+    tool.getRange(r0 + idxFuckSignal, c0 + 1, 1, 1)
+      .setHorizontalAlignment("right")
       .setNumberFormat("0.00");
-    tool.getRange(r0 + 11, c0 + 1, 1, 1)
+    tool.getRange(r0 + idxFuckSignal, c0 + 2, 1, 1)
       .setNumberFormat("0.0%")
-      .setHorizontalAlignment("left");
+      .setHorizontalAlignment("right");
   }
 }
 
