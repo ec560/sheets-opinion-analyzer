@@ -184,10 +184,30 @@ function analyzeSelectedLevel() {
   const topWeight = top[1];
   const secondTier = second[0];
   const secondWeight = second[1];
+  const isBeginnerFamilyTier = (name) => name === "Beginner" || name === "Insane Demon";
+  const decisionTierName_ = (name) => isBeginnerFamilyTier(name) ? "Beginner" : name;
+  const decisionOrderedTierNames = orderedTierNames.filter(name => name !== "Insane Demon");
+  const decisionWeightsByTier = {};
+  for (const n of decisionOrderedTierNames) decisionWeightsByTier[n] = 0;
+  for (const n of orderedTierNames) {
+    const decisionName = decisionTierName_(n);
+    if (decisionName in decisionWeightsByTier) {
+      decisionWeightsByTier[decisionName] += (weightsByTier[n] || 0);
+    }
+  }
+  const decisionEntries = Object.entries(decisionWeightsByTier).sort((a, b) => b[1] - a[1]);
+  const decisionTop = decisionEntries[0] || ["(none)", 0];
+  const decisionSecond = decisionEntries[1] || ["(none)", 0];
+  const decisionTopTier = decisionTop[0];
+  const decisionTopWeight = decisionTop[1];
+  const decisionSecondTier = decisionSecond[0];
+  const decisionSecondWeight = decisionSecond[1];
+  const minimumOpinionWeight = decisionTopWeight;
+  const lockSharePct = allWeight > 0 ? decisionTopWeight / allWeight : 0;
 
   // Majority rule (weighted)
-  const passesMajority = topWeight >= 4; // Must have at least 4 opinions (by weight)
-  const topVsSecond = (topWeight - secondWeight) >= 3; // Must be leading by at least 3 points
+  const passesMajority = minimumOpinionWeight >= 4; // Must have at least 4 opinions (by weight)
+  const topVsSecond = (decisionTopWeight - decisionSecondWeight) >= 3; // Must be leading by at least 3 points
 
   // Weighted SD over tier indices (orderedTierNames)
   const idx = {}; orderedTierNames.forEach((t, i) => idx[t] = i);
@@ -244,19 +264,48 @@ function analyzeSelectedLevel() {
   const toppct = allWeight > 0 ? topWeight / allWeight : 0;
   const fuckpct = allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0;
 
+  const decisionIdxOf = (name) => decisionOrderedTierNames.indexOf(name);
+  const decisionSumRange = (startIdx, endIdx) => {
+    let s = 0;
+    for (let i = startIdx; i <= endIdx; i++) s += (decisionWeightsByTier[decisionOrderedTierNames[i]] || 0);
+    return s;
+  };
+  const decisionCurrentTier = isPending ? currentTier : decisionTierName_(currentTier);
+  const decisionCurrentIdx = decisionIdxOf(decisionCurrentTier);
+  const decisionCenterTier = decisionTierName_(rawMedianLabel);
+  const decisionCenterIdx = decisionIdxOf(decisionCenterTier);
+  const decisionTopIdx = decisionIdxOf(decisionTopTier);
+  const decisionRunnerIdx = decisionIdxOf(decisionSecondTier);
+  const decisionSplitLowIdx = pickSplitLowIdx_(
+    decisionOrderedTierNames,
+    decisionWeightsByTier,
+    decisionTopIdx,
+    decisionRunnerIdx,
+    decisionCurrentIdx,
+    decisionCenterIdx,
+    isPending
+  );
+  const decisionSplitHighIdx = decisionSplitLowIdx + 1;
+  const decisionSplitLeftTotal = decisionSumRange(0, decisionSplitLowIdx);
+  const decisionSplitRightTotal = decisionSumRange(decisionSplitHighIdx, decisionOrderedTierNames.length - 1);
+
   let vtn = "";
   if (fuckPresent) {
     if ((((allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0) >= 0.2 && toppct < 0.35) || fuckpct >= 0.5) || (sd >= 2 && passesMajority)) {
       vtn = "Fuck";
     } else {
-      vtn = (splitLeftTotal > splitRightTotal) ? splitLowTier : splitHighTier;
+      vtn = (decisionSplitLeftTotal > decisionSplitRightTotal)
+        ? decisionOrderedTierNames[decisionSplitLowIdx]
+        : decisionOrderedTierNames[decisionSplitHighIdx];
     }
   } else {
-    vtn = (splitLeftTotal > splitRightTotal) ? splitLowTier : splitHighTier;
+    vtn = (decisionSplitLeftTotal > decisionSplitRightTotal)
+      ? decisionOrderedTierNames[decisionSplitLowIdx]
+      : decisionOrderedTierNames[decisionSplitHighIdx];
   }
 
   const verdictTier = String(vtn).trim();
-  const verdictDiffersFromCurrent = verdictTier !== "" && verdictTier !== currentTier;
+  const verdictDiffersFromCurrent = verdictTier !== "" && verdictTier !== decisionCurrentTier;
 
   let splitValue = "";
   if (allWeight >= 50 && allWeight < 100) {
@@ -268,12 +317,12 @@ function analyzeSelectedLevel() {
   }
 
   const splitThreshold = splitValue; // minimum points difference needed to consider split as a majority
-  const splitMargin = Math.abs(splitLeftTotal - splitRightTotal);
+  const splitMargin = Math.abs(decisionSplitLeftTotal - decisionSplitRightTotal);
   const splitMarginPct = totalWeight > 0 ? (splitMargin / totalWeight) : 0;
   const SPLIT_PCT_MIN_PENDING = 0.20;   // 60% side majority for pending
   const SPLIT_PCT_MIN_MOVES   = 0.05;   // at least 50/50 for non-pending levels
 
-  const passesSplitMajority = Math.abs(splitLeftTotal - splitRightTotal) >= splitThreshold;
+  const passesSplitMajority = Math.abs(decisionSplitLeftTotal - decisionSplitRightTotal) >= splitThreshold;
   const passesSplitPct = isPending ? (splitMarginPct >= SPLIT_PCT_MIN_PENDING): (splitMarginPct >= SPLIT_PCT_MIN_MOVES);
 
   // Output
@@ -295,8 +344,8 @@ function analyzeSelectedLevel() {
   out.push([`Standard Deviation`, sd, "", ""]);
 
   let verdictTierName = verdictTier;
-  const verdictIdx = (splitLeftTotal > splitRightTotal) ? splitLowIdx : splitHighIdx;
-  const verdictBaseName = orderedTierNames[verdictIdx];
+  const verdictIdx = (decisionSplitLeftTotal > decisionSplitRightTotal) ? decisionSplitLowIdx : decisionSplitHighIdx;
+  const verdictBaseName = decisionOrderedTierNames[verdictIdx];
 
   if (fuckPresent) {
     if (((fuckpct >= 0.2) && toppct < 0.35)
@@ -304,7 +353,7 @@ function analyzeSelectedLevel() {
       verdictTierName = "Fuck";
     } else if (currentTier != "Fuck") {
       let arrow = "";
-      if (currentIdx >= 0) {
+      if (decisionCurrentIdx >= 0) {
         if (verdictIdx < currentIdx) arrow = "↓    ";
         else if (verdictIdx > currentIdx) arrow = "↑    ";
       }
@@ -315,7 +364,7 @@ function analyzeSelectedLevel() {
       verdictTierName = verdictBaseName;
     } else {
       let arrow = "";
-      if (currentIdx >= 0) {
+      if (decisionCurrentIdx >= 0) {
         if (verdictIdx < currentIdx) arrow = "↓    ";
         else if (verdictIdx > currentIdx) arrow = "↑    ";
       }
@@ -414,6 +463,8 @@ function analyzeSelectedLevel() {
     verdictTier,
     verdictTierName,
     verdictBaseName,
+    minimumOpinionWeight,
+    lockSharePct,
     allWeight,
     passesSplitPct,
     splitMarginPct,

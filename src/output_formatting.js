@@ -41,6 +41,8 @@ function formatAnalysisOutput_(
   verdictTier,
   verdictTierName,
   verdictBaseName,
+  minimumOpinionWeight,
+  lockSharePct,
   totalWeightedOpinions,
   passesSplitPct,
   splitMarginPct,
@@ -226,12 +228,12 @@ function formatAnalysisOutput_(
       } else {
         // Regular logic
         if (isPending && !passesMajority) {
-          if (topWeight >= 3) {
+          if (minimumOpinionWeight >= 3) {
             tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#ffdfcc");
           }
-          msgCell.setValue("Needs more opinions (" + topWeight + "/4)");
+          msgCell.setValue("Needs more opinions (" + minimumOpinionWeight + "/4)");
         } else if (!passesSplitMajority) {
-            msgCell.setValue("Split not decisive (+" + splitMargin.toFixed(2).replace(/\.?0+$/, "") + " " + verdictBaseName.toLowerCase() + ")");
+          msgCell.setValue("Split not decisive (+" + splitMargin.toFixed(2).replace(/\.?0+$/, "") + " " + verdictBaseName.toLowerCase() + ")");
         } else if (totalWeightedOpinions < 5 || !passesMajority) {
           msgCell.setValue("Needs more opinions (" + totalWeightedOpinions.toFixed(2).replace(/\.?0+$/, "") + " total)");
         } else if (!passesSplitPct && verdictDiffersFromCurrent) {
@@ -241,7 +243,7 @@ function formatAnalysisOutput_(
             ((isPending ? 0.20 : 0.05) * 100).toFixed(0) +
             "% required)");
           tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#ffdfcc");
-        } else if (toppct >= 0.75 && totalWeightedOpinions >= 45) {
+        } else if (lockSharePct >= 0.75 && totalWeightedOpinions >= 45) {
           msgCell.setValue("🔒 Lock threshold met");
           tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#e6f4ea");
         } else if (!verdictDiffersFromCurrent) {
