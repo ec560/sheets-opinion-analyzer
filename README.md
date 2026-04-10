@@ -1,141 +1,136 @@
-# sheets-opinion-analyzer
-Analyzes player opinions from google sheets and prints relevant statistics to assist with placement/movement of levels in their respective difficulty categories.
+# Opinion Analyzer for Google Sheets
 
-[Setup](#setup)
+This project is a Google Apps Script tool for reviewing placement opinions stored in a Google Sheet. It creates a dedicated `Tier Analysis` sheet, lets you choose a tier and level via dropdown, loads the corresponding opinions, and generates weighted output intended to help with placement and movement decisions.
 
-[Updating to Latest Version](#updating-to-latest-version)
+> [!WARNING]
+> The analyzer is still being tested in live use, so some results may still need manual judgment.
 
-[Using the Sheet](#using-the-sheet)
+> [!IMPORTANT]  
+> If you encounter any bugs please open an issue or contact me directly.
 
-#### Note: The current version of the opinion analyzer is still undergoing practical testing, and may be incomplete/inaccurate at times.
+Credit to `Amberette/Cadrega` for inspiration and the original tier config.
 
-Credit to `Amberette/Cadrega` for inspiration and basic config structures.
+## Contents
+
+- [Setup](#setup)
+- [Sheet Layout](#sheet-layout)
+- [Using the Analyzer](#using-the-analyzer)
+- [Updating](#updating)
+- [Common Issues](#common-issues)
 
 ## Setup
 
-This project uses `clasp` to sync changes between github and google apps script. Some linux terminal and git knowledge required.
+This project is meant to be pushed to a spreadsheet-bound Apps Script project with [`clasp`](https://github.com/google/clasp).
 
-### Forking (Optional)
+### Requirements
 
-Forking this repository is **optional**. You may want to fork if you plan to modify the analyzer code or maintain your own version of the project on GitHub.
+- [Node.js](https://nodejs.org/) and `npm`
+- a Google account with editor access to the target spreadsheet
+- [clasp](https://github.com/google/clasp)
 
-If you only plan to use the analyzer with your own Google Sheet, you can just clone the repository directly without forking.
-
----
-
-### Clone the Repository
-
-Open a terminal and run:
-
-```bash
-git clone https://github.com/ec560/sheets-opinion-analyzer.git
-```
-
-Then navigate into the project folder:
-
-```bash
-cd sheets-opinion-analyzer
-```
-
-After cloning the repository and navigating to the root folder, continue with the following steps.
-
----
-
-### On Mac, Linux, or WSL:
+Install clasp:
 
 ```bash
 npm install -g @google/clasp
 ```
----
 
-### Authenticate
-
-Choose the **Google account associated with the spreadsheet** you will use. If necessary, use an alternate Google account.
+Sign in with the Google account that has edit access to the spreadsheet:
 
 ```bash
 clasp login
 ```
-Ensure you are only logged into the google account you want to use. Having multiple signed-in accounts may cause linking issues
 
----
+> [!NOTE]  
+> If the Apps Script API is not enabled for your account yet, enable it here:
+> [https://script.google.com/home/usersettings](https://script.google.com/home/usersettings)
 
-### Get Your Spreadsheet ID
+### Clone the Repository
 
-Open your Google Sheet and copy the ID from the URL:
-
+```bash
+git clone https://github.com/ec560/sheets-opinion-analyzer.git
+cd sheets-opinion-analyzer
 ```
+
+### Bind the Script to a Spreadsheet
+
+Open the target Google Sheet and copy the spreadsheet ID from its URL:
+
+```text
 https://docs.google.com/spreadsheets/d/<YOUR_SHEET_ID>/edit
 ```
 
-Copy the string of text between `/d/` and `/edit`.
-
----
-
-### Create the Apps Script Project (Bound to the Sheet)
-
-Choose a unique script name (any name works).
+Then create a script project bound to that spreadsheet:
 
 ```bash
-clasp create-script --title "<YOUR_SCRIPT_NAME>" --parentId <YOUR_SHEET_ID>
+clasp create-script --title "<YOUR_SCRIPT_NAME>" --parentId "<YOUR_SHEET_ID>"
 ```
 
-If you see an error like:
+> [!NOTE]  
+> If the spreadsheet already has a bound Apps Script project, you will need to remove or migrate that project before creating a new one.
+>
+> This repository keeps its Apps Script source files in `src/`. Before running `clasp push`, make sure your `.clasp.json` is configured to use `src` as the `rootDir`.
 
-```
-"User has not enabled the Apps Script API."
-```
-
-Enable the Apps Script API for your account with the provided link, then run the command again.
-
-**Important:** The create script will not work if you have an existing project connected to your spreadsheet. 
-You must first delete that project and migrate the contents to a safe folder, and then run the commands. 
-
-If you fork the repository, it is possible to combine the functionality of both of your scripts as long as your global variables do not conflict.
-
----
-
-### Push the code
+### Push the Code
 
 ```bash
 clasp push
 ```
-The files will now be available in the associated apps script dashboard to your sheet.
 
----
+After pushing, refresh the spreadsheet. A `Tier Tools` menu should appear with the following actions:
 
-### Activate in Google Sheets
+- `Setup`
+- `Refresh`
+- `Analyze Selected Level`
 
-Refresh your Google Sheet; You should now see a new **"Tier Tools"** menu button at the top of the sheet.
+Run `Setup` once to create the `Tier Analysis` sheet.
 
-![Tier Tools Menu](https://github.com/user-attachments/assets/b0fdafca-0fc4-4884-80cf-ed9698763271)
+## Sheet Layout
 
-Pressing the "Setup" button from Tier Tools will create the **Tier Analysis** sheet.
+The analyzer expects the spreadsheet to follow a specific layout.
 
----
+Each tier should have its own sheet. The sheet name is used directly by the analyzer, so it should match the tier you want to analyze. On each tier sheet, `row 1` should contain level names. Every level should occupy three columns in the following order:
 
-## Updating to Latest Version
+```text
+Player | Opinion | Reliability
+```
 
-If you forked the repository you must run the following command in your root folder first:
+Opinion rows begin on `row 2`.
+
+The analyzer depends on cell colors to gather opinion data. The tier is derived from cell colors, and reliability weighting also depends on cell colors rather than text alone. The current tier ordering, difficulty colors, split colors, and reliability mappings are defined in [`src/config.js`](./src/config.js).
+
+One thing to be aware of is that the tier dropdown includes every sheet in the workbook except `Tier Analysis`. If your spreadsheet contains unrelated sheets, they will appear in the selector as well.
+
+## Using the Analyzer
+
+Open the `Tier Analysis` sheet created by setup. Select a tier in cell `B1`, then select a level in cell `B2`. When a level is chosen, the analyzer clears the previous output, copies the selected level's `Player | Opinion | Reliability` data into the analysis sheet, and runs the analysis automatically.
+
+If the source sheet changes and you want to reload the selected level, use the `Tier Tools -> Refresh`. If you only want to rerun the calculations on the currently loaded data, use `Tier Tools -> Analyze Selected Level`.
+
+The output panel includes the selected tier and level, total weighted opinions, weighted top vote and runner-up, mean, median, outliers, standard deviation, split totals, a `Place/Move` decision, and a tier distribution table. When applicable, it also displays `Fuck` opinion percentage and related verdict handling.
+
+## Updating
+
+If you forked the repository, add the original repository as an upstream remote once:
 
 ```bash
 git remote add upstream https://github.com/ec560/sheets-opinion-analyzer.git
 ```
 
-1. Pull the latest repository changes:
+To update your local copy and republish it to the spreadsheet:
 
 ```bash
 git pull
-```
-
-2. Push updates to your Google Sheet:
-
-```bash
 clasp push
 ```
 
-3. Refresh your spreadsheet.
+Refresh the spreadsheet after pushing.
 
-## Using the sheet
+## Common Issues
 
-### Example output
-<img width="1191" height="759" alt="image" src="https://github.com/user-attachments/assets/262b0181-b6f1-4881-8005-f34692e8e43f" />
+If the `Tier Tools` menu does not appear, refresh or reopen the spreadsheet and make sure `clasp push` completed successfully. It is also worth confirming that the Apps Script project is bound to the spreadsheet you meant to use.
+
+If no levels appear after selecting a tier, make sure the selected sheet exists and that `row 1` contains non-empty level headers.
+
+If opinions fail to load, make sure the selected level actually has data below `row 1`, and make sure the sheet follows the expected three-column `Player | Opinion | Reliability` structure.
+
+If results look wrong, the first thing to verify is the sheet formatting. This analyzer relies on background and font colors, so incorrect colors will impact how opinions are interpreted.
