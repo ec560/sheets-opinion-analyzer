@@ -17,6 +17,106 @@ function applyTierSheetColor_(tool, r0, c0, outRowCount) {
     .setFontWeight("bold");
 }
 
+function trimFixed_(value, digits) {
+  return Number(value).toFixed(digits).replace(/\.?0+$/, "");
+}
+
+function buildSplitNotDecisiveMessage_(splitMargin, verdictBaseName) {
+  return "Split not decisive (+" + trimFixed_(splitMargin, 2) + " " + verdictBaseName.toLowerCase() + ")";
+}
+
+function buildLowSplitMarginMessage_(splitMarginPct, isPending) {
+  const requiredPct = isPending ? 0.20 : 0.05;
+  return "Low split margin (" +
+    (splitMarginPct * 100).toFixed(0) +
+    "% ; " +
+    (requiredPct * 100).toFixed(0) +
+    "% required)";
+}
+
+function resolvePlaceMoveFailure_(ctx) {
+  const {
+    isPending,
+    passesMajority,
+    passesSplitMajority,
+    verdictDiffersFromCurrent,
+    fuckPresent,
+    sd,
+    toppct,
+    fuckpct,
+    minimumOpinionWeight,
+    lockSharePct,
+    totalWeightedOpinions,
+    passesSplitPct,
+    splitMarginPct,
+    splitMargin,
+    verdictBaseName
+  } = ctx;
+
+  const splitNotDecisiveMessage = buildSplitNotDecisiveMessage_(splitMargin, verdictBaseName);
+  const MIN_TOTAL_OPINIONS_TO_PLACE = 4;
+  if (totalWeightedOpinions < MIN_TOTAL_OPINIONS_TO_PLACE) {
+    return { text: "Needs more opinions" };
+  }
+
+  const startsInFuckMode = !!(fuckPresent && (fuckpct >= 0.5 || toppct < 0.35));
+  const fuckRuleByShare = fuckpct >= 0.2;
+  const fuckRuleByVolatility = sd >= 2;
+  const inFuckMode = startsInFuckMode && (fuckRuleByShare || fuckRuleByVolatility);
+
+  if (inFuckMode) {
+    if (isPending && !passesMajority) {
+      return { text: "Needs more opinions" };
+    }
+
+    if (!verdictDiffersFromCurrent || fuckpct >= 0.5) {
+      return { text: "No movement necessary (F)", bg: "#efefef" };
+    }
+
+    if (!passesSplitMajority && fuckRuleByVolatility) {
+      return { text: "Split not decisive (F)" };
+    }
+
+    return { text: "Rules not met (F)" };
+  }
+
+  if (isPending && !passesSplitMajority) {
+    return { text: splitNotDecisiveMessage };
+  }
+
+  if (isPending && !passesMajority) {
+    return { text: "Needs more opinions" };
+  }
+
+  if (!passesSplitMajority) {
+    return { text: splitNotDecisiveMessage };
+  }
+
+  if (!passesMajority) {
+    return { text: "Needs more opinions" };
+  }
+
+  if (!passesSplitPct && verdictDiffersFromCurrent) {
+    return {
+      text: buildLowSplitMarginMessage_(splitMarginPct, isPending),
+      bg: "#ffdfcc"
+    };
+  }
+
+  if (lockSharePct >= 0.75 && totalWeightedOpinions >= 45) {
+    return {
+      text: "Lock threshold met (" + (lockSharePct * 100).toFixed(0) + "%)",
+      bg: "#e6f4ea"
+    };
+  }
+
+  if (!verdictDiffersFromCurrent) {
+    return { text: "No movement necessary", bg: "#efefef" };
+  }
+
+  return { text: "Rules not met (please tell opayc)" };
+}
+
 function formatAnalysisOutput_(
   tool,
   outRowCount,
@@ -201,57 +301,27 @@ function formatAnalysisOutput_(
     if (val !== "YES") {
       msgCell.setValue("");
 
-      // Decide whether we are in "fuck mode"
-      let fuckMode = !!(fuckPresent && (fuckpct >= 0.5 || toppct < 0.35));
+      const failure = resolvePlaceMoveFailure_({
+        isPending,
+        passesMajority,
+        passesSplitMajority,
+        verdictDiffersFromCurrent,
+        fuckPresent,
+        sd,
+        toppct,
+        fuckpct,
+        minimumOpinionWeight,
+        lockSharePct,
+        totalWeightedOpinions,
+        passesSplitPct,
+        splitMarginPct,
+        splitMargin,
+        verdictBaseName
+      });
 
-      // In fuck mode, try the fuck triggers first.
-      // If neither trigger is met, fall back to regular logic.
-      let ruleA = false, ruleB = false;
-      if (fuckMode) {
-        ruleA = (fuckpct >= 0.2);     // fuck share trigger (only valid if toppct < 0.4 already)
-        ruleB = (sd >= 2);            // volatility trigger
-
-        if (!ruleA && !ruleB) fuckMode = false;
-      }
-
-      if (fuckMode) {
-        if ((isPending && !passesMajority) || totalWeightedOpinions < 5) {
-          msgCell.setValue("Needs more opinions (F)");
-        } else if (!verdictDiffersFromCurrent || fuckpct >= 0.5) {
-          msgCell.setValue("No movement necessary (F)");
-          tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#efefef");
-        } else if (!passesSplitMajority && ruleB) {
-          msgCell.setValue("Split not decisive (F)");
-        } else {
-          msgCell.setValue("Rules not met (F)");
-        }
-      } else {
-        // Regular logic
-        if (isPending && !passesMajority) {
-          if (minimumOpinionWeight >= 3) {
-            tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#ffdfcc");
-          }
-          msgCell.setValue("Needs more opinions (" + minimumOpinionWeight + "/4)");
-        } else if (!passesSplitMajority) {
-          msgCell.setValue("Split not decisive (+" + splitMargin.toFixed(2).replace(/\.?0+$/, "") + " " + verdictBaseName.toLowerCase() + ")");
-        } else if (totalWeightedOpinions < 5 || !passesMajority) {
-          msgCell.setValue("Needs more opinions (" + totalWeightedOpinions.toFixed(2).replace(/\.?0+$/, "") + " total)");
-        } else if (!passesSplitPct && verdictDiffersFromCurrent) {
-          msgCell.setValue("Low split margin (" +
-            (splitMarginPct * 100).toFixed(0) +
-            "% ; " +
-            ((isPending ? 0.20 : 0.05) * 100).toFixed(0) +
-            "% required)");
-          tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#ffdfcc");
-        } else if (lockSharePct >= 0.75 && totalWeightedOpinions >= 45) {
-          msgCell.setValue("🔒 Lock threshold met");
-          tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#e6f4ea");
-        } else if (!verdictDiffersFromCurrent) {
-          msgCell.setValue("No movement necessary");
-          tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground("#efefef");
-        } else {
-          msgCell.setValue("Rules not met (please tell opayc)");
-        }
+      msgCell.setValue(failure.text);
+      if (failure.bg) {
+        tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground(failure.bg);
       }
     }
   }

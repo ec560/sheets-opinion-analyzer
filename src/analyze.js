@@ -203,11 +203,6 @@ function analyzeSelectedLevel() {
   const decisionSecondTier = decisionSecond[0];
   const decisionSecondWeight = decisionSecond[1];
   const minimumOpinionWeight = decisionTopWeight;
-  const lockSharePct = allWeight > 0 ? decisionTopWeight / allWeight : 0;
-
-  // Majority rule (weighted)
-  const passesMajority = minimumOpinionWeight >= 4; // Must have at least 4 opinions (by weight)
-  const topVsSecond = (decisionTopWeight - decisionSecondWeight) >= 3; // Must be leading by at least 3 points
 
   // Weighted SD over tier indices (orderedTierNames)
   const idx = {}; orderedTierNames.forEach((t, i) => idx[t] = i);
@@ -288,6 +283,12 @@ function analyzeSelectedLevel() {
   const decisionSplitHighIdx = decisionSplitLowIdx + 1;
   const decisionSplitLeftTotal = decisionSumRange(0, decisionSplitLowIdx);
   const decisionSplitRightTotal = decisionSumRange(decisionSplitHighIdx, decisionOrderedTierNames.length - 1);
+  const decisionLockSideTotal = Math.max(decisionSplitLeftTotal, decisionSplitRightTotal);
+  const lockSharePct = allWeight > 0 ? decisionLockSideTotal / allWeight : 0;
+  const MIN_TOTAL_OPINIONS_TO_PLACE = 4;
+  const hasMinimumTotalOpinions = allWeight >= MIN_TOTAL_OPINIONS_TO_PLACE;
+  // Placement gating is based on total weighted opinions, not top-tier concentration.
+  const passesMajority = hasMinimumTotalOpinions;
 
   let vtn = "";
   if (fuckPresent) {
@@ -377,18 +378,22 @@ function analyzeSelectedLevel() {
 
   if (fuckPresent) {
     const fuckShare = (allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0);
-    if ((((fuckShare >= 0.2 && toppct < 0.35) || fuckpct >= 0.5) && verdictDiffersFromCurrent)
-      || ((passesMajority || (topVsSecond && !isPending)) &&
-        passesSplitMajority &&
-        passesSplitPct &&
-        verdictDiffersFromCurrent)) {
+    if (
+      hasMinimumTotalOpinions &&
+      (
+        (((fuckShare >= 0.2 && toppct < 0.35) || fuckpct >= 0.5) && verdictDiffersFromCurrent) ||
+        (passesSplitMajority && passesSplitPct && verdictDiffersFromCurrent)
+      )
+    ) {
       canMove = true;
     }
   } else {
-    if ((passesMajority || (topVsSecond && !isPending)) &&
-        passesSplitMajority &&
-        passesSplitPct &&
-        verdictDiffersFromCurrent) {
+    if (
+      hasMinimumTotalOpinions &&
+      passesSplitMajority &&
+      passesSplitPct &&
+      verdictDiffersFromCurrent
+    ) {
       canMove = true;
     }
   }
