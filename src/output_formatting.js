@@ -45,6 +45,7 @@ function resolvePlaceMoveFailure_(ctx) {
     toppct,
     fuckpct,
     minimumOpinionWeight,
+    rawOpinionCount,
     lockSharePct,
     totalWeightedOpinions,
     passesSplitPct,
@@ -103,7 +104,7 @@ function resolvePlaceMoveFailure_(ctx) {
     };
   }
 
-  if (lockSharePct >= 0.75 && totalWeightedOpinions >= 45) {
+  if (lockSharePct >= 0.75 && rawOpinionCount >= 50 && totalWeightedOpinions >= 50) {
     return {
       text: "Lock threshold met (" + (lockSharePct * 100).toFixed(0) + "%)",
       bg: "#e6f4ea"
@@ -142,6 +143,7 @@ function formatAnalysisOutput_(
   verdictTierName,
   verdictBaseName,
   minimumOpinionWeight,
+  rawOpinionCount,
   lockSharePct,
   totalWeightedOpinions,
   passesSplitPct,
@@ -311,6 +313,7 @@ function formatAnalysisOutput_(
         toppct,
         fuckpct,
         minimumOpinionWeight,
+        rawOpinionCount,
         lockSharePct,
         totalWeightedOpinions,
         passesSplitPct,

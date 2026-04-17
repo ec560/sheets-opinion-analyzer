@@ -469,6 +469,7 @@ function analyzeSelectedLevel() {
     verdictTierName,
     verdictBaseName,
     minimumOpinionWeight,
+    rawCount,
     lockSharePct,
     allWeight,
     passesSplitPct,
