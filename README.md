@@ -1,6 +1,6 @@
 # Opinion Analyzer for Google Sheets
 
-This project is a Google Apps Script tool for reviewing placement opinions stored in a Google Sheet. It creates a dedicated `Tier Analysis` sheet, lets you choose a tier and level via dropdown, loads the corresponding opinions, and generates weighted output intended to help with placement and movement decisions.
+This project is a Google Apps Script tool for reviewing Geometry Dash level placement opinions stored in a Google Sheet. It creates a dedicated `Tier Analysis` sheet, lets you choose a tier and level via dropdown, loads the corresponding opinions, and generates weighted output intended to help with placement and movement decisions.
 
 > [!WARNING]
 > The analyzer is still being tested in live use, so some results may still need manual judgment.
