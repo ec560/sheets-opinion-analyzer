@@ -29,6 +29,8 @@ function onOpen() {
     .addItem("Setup", "setupTierAnalysis")
     .addItem("Refresh", "populateSelectedLevel")
     .addItem("Analyze Selected Level", "analyzeSelectedLevel")
+    .addSeparator()
+    .addItem("Scan Tier Flags", "scanSelectedTierFlags")
     .addToUi();
 }
 

@@ -1,13 +1,24 @@
 // global constants for sheet names, cell locations, and color mappings
 
 const ANALYSIS_SHEET_NAME = "Tier Analysis";
-const VERSION = "v1.3.3";
+const FLAG_SCAN_SHEET_NAME = "Tier Flags";
+const VERSION = "v1.4.0-beta";
 const TIER_CELL = "B1";
 const LEVEL_CELL = "B2";
 const DATA_START_ROW = 4;                      // where A:C gets populated
 const OUTPUT_COL = 5;                          // column E for results 
 const OUTPUT_START_ROW = 1;
 const OUTPUT_WIDTH = 4;                        // E:H block
+
+const FLAG_LOW_OPINION_WEIGHT = 4;
+const FLAG_BOOK_LEAN_WEIGHT = 1.5;
+const FLAG_LOCK_SHARE = 0.75;
+const FLAG_LOCK_MIN_RAW_COUNT = 50;
+const FLAG_LOCK_MIN_WEIGHT = 50;
+
+function isAnalyzerUtilitySheetName_(name) {
+  return name === ANALYSIS_SHEET_NAME || name === FLAG_SCAN_SHEET_NAME;
+}
 
 // reliability background color = multiplier
 const reliabilityFactors = {

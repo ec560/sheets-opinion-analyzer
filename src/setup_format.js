@@ -17,7 +17,7 @@ function setupTierAnalysis() {
   // Populate tier dropdown from sheet names (each tier is its own sheet)
   const tierSheetNames = ss.getSheets()
     .map(s => s.getName())
-    .filter(name => name !== ANALYSIS_SHEET_NAME);
+    .filter(name => !isAnalyzerUtilitySheetName_(name));
 
   const dvTier = SpreadsheetApp.newDataValidation()
     .requireValueInList(tierSheetNames, true)

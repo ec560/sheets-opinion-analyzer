@@ -1,0 +1,317 @@
+function scanSelectedTierFlags() {
+  const ss = SpreadsheetApp.getActive();
+  const ui = SpreadsheetApp.getUi();
+  const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
+  const tierName = getFlagScanTierName_(ss, tool);
+
+  if (!tierName) {
+    ui.alert("Tier Flag Scan", "Open a tier sheet or pick a tier in " + TIER_CELL + " first.", ui.ButtonSet.OK);
+    return;
+  }
+
+  const tierSheet = ss.getSheetByName(tierName);
+  if (!tierSheet || isAnalyzerUtilitySheetName_(tierName)) {
+    ui.alert("Tier Flag Scan", "Could not find a tier sheet named \"" + tierName + "\".", ui.ButtonSet.OK);
+    return;
+  }
+
+  const result = buildTierFlagScan_(tierName, tierSheet);
+  if (result.scanned === 0) {
+    ui.alert("Tier Flag Scan", "No level headers found on \"" + tierName + "\".", ui.ButtonSet.OK);
+    return;
+  }
+
+  const outputSheet = renderTierFlagScan_(ss, tierName, result.rows);
+  ss.setActiveSheet(outputSheet);
+
+  ui.alert(
+    "Tier Flag Scan",
+    result.rows.length + " flagged level" + (result.rows.length === 1 ? "" : "s") +
+      " found across " + result.scanned + " level" + (result.scanned === 1 ? "" : "s") + ".",
+    ui.ButtonSet.OK
+  );
+}
+
+function getFlagScanTierName_(ss, tool) {
+  const active = ss.getActiveSheet();
+  if (active) {
+    const activeName = active.getName();
+    if (!isAnalyzerUtilitySheetName_(activeName)) return activeName;
+  }
+
+  if (!tool) return "";
+  return String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim();
+}
+
+function buildTierFlagScan_(tierName, tierSheet) {
+  const headers = getLevelHeaders_(tierSheet);
+  const lastRow = tierSheet.getLastRow();
+  const lastCol = tierSheet.getLastColumn();
+  const numRows = Math.max(0, lastRow - 1);
+
+  let vals = [];
+  let bgs = [];
+  let fcs = [];
+  if (numRows > 0 && lastCol > 0) {
+    const sourceRange = tierSheet.getRange(2, 1, numRows, lastCol);
+    vals = sourceRange.getValues();
+    bgs = sourceRange.getBackgrounds();
+    fcs = sourceRange.getFontColors();
+  }
+
+  const rows = [];
+  headers.forEach(header => {
+    const levelData = extractLevelFlagData_(header, vals, bgs, fcs, lastCol);
+    const analysis = calculateLevelAnalysis_(
+      tierName,
+      header.name,
+      levelData.vals,
+      levelData.bgs,
+      levelData.fcs
+    );
+    if (analysis.rawCount === 0 && analysis.allAndFuck === 0) return;
+
+    const flags = buildLevelFlags_(analysis);
+    if (flags.length > 0) rows.push(buildTierFlagRow_(analysis, flags));
+  });
+
+  return {
+    scanned: headers.length,
+    rows
+  };
+}
+
+function extractLevelFlagData_(header, vals, bgs, fcs, lastCol) {
+  const outVals = [];
+  const outBgs = [];
+  const outFcs = [];
+  const startIdx = header.col - 1;
+
+  if (startIdx + 2 >= lastCol) {
+    return { vals: outVals, bgs: outBgs, fcs: outFcs };
+  }
+
+  for (let r = 0; r < vals.length; r++) {
+    const row = [
+      safeCellValue_(vals[r][startIdx]),
+      safeCellValue_(vals[r][startIdx + 1]),
+      safeCellValue_(vals[r][startIdx + 2])
+    ];
+
+    if (isBlankFlagOpinionRow_(row)) continue;
+
+    outVals.push(row);
+    outBgs.push([
+      bgs[r][startIdx],
+      bgs[r][startIdx + 1],
+      bgs[r][startIdx + 2]
+    ]);
+    outFcs.push([
+      fcs[r][startIdx],
+      fcs[r][startIdx + 1],
+      fcs[r][startIdx + 2]
+    ]);
+  }
+
+  return { vals: outVals, bgs: outBgs, fcs: outFcs };
+}
+
+function isBlankFlagOpinionRow_(row) {
+  return String(row[0]).trim() === "" &&
+    String(row[1]).trim() === "" &&
+    String(row[2]).trim() === "";
+}
+
+function buildLevelFlags_(analysis) {
+  const flags = [];
+
+  if (analysis.allWeight < FLAG_LOW_OPINION_WEIGHT) {
+    flags.push("low opinion count (" + formatFlagNumber_(analysis.allWeight) + "/" + FLAG_LOW_OPINION_WEIGHT + " weight)");
+  }
+
+  if (analysis.isLockWorthy) {
+    flags.push("lock alert (" + (analysis.lockSharePct * 100).toFixed(0) + "% " + analysis.lockSideLabel + ")");
+  }
+
+  if (!analysis.canMove && analysis.bookAlert) {
+    flags.push(formatBookAlert_(analysis.bookAlert));
+  }
+
+  if (analysis.canMove) {
+    if (analysis.isPending) {
+      flags.push("placement alert (" + analysis.verdictTier + ")");
+    } else {
+      const direction = analysis.moveDirection ? ", " + analysis.moveDirection : "";
+      flags.push("move alert (" + analysis.verdictTier + direction + ")");
+    }
+  }
+
+  return flags;
+}
+
+function buildTierFlagRow_(analysis, flags) {
+  return [
+    analysis.levelName,
+    formatFlagNumber_(analysis.allWeight),
+    analysis.rawCount,
+    flags.join("; "),
+    analysis.splitLowTier + " / " + analysis.splitHighTier,
+    formatFlagNumber_(analysis.splitLeftTotal) + " | " + formatFlagNumber_(analysis.splitRightTotal),
+    analysis.isLockWorthy ? "" : formatDifference_(analysis.difference)
+  ];
+}
+
+function renderTierFlagScan_(ss, tierName, flagRows) {
+  let sh = ss.getSheetByName(FLAG_SCAN_SHEET_NAME);
+  if (!sh) sh = ss.insertSheet(FLAG_SCAN_SHEET_NAME);
+
+  sh.clear();
+
+  const headers = [
+    "Level",
+    "Weight",
+    "Raw",
+    "Flags",
+    "Split",
+    "Split totals",
+    "Difference"
+  ];
+
+  const titleRow = new Array(headers.length).fill("");
+  titleRow[0] = "Tier flag scan";
+  titleRow[1] = tierName;
+  titleRow[2] = VERSION;
+  titleRow[3] = new Date();
+
+  const rows = [titleRow, headers];
+  if (flagRows.length > 0) {
+    flagRows.forEach(row => rows.push(row));
+  } else {
+    const emptyRow = new Array(headers.length).fill("");
+    emptyRow[0] = "No flagged levels";
+    rows.push(emptyRow);
+  }
+
+  sh.getRange(1, 1, rows.length, headers.length).setValues(rows);
+  formatTierFlagScan_(sh, rows, headers.length);
+  return sh;
+}
+
+function formatTierFlagScan_(sh, rows, colCount) {
+  const rowCount = rows.length;
+  if (rowCount === 0 || colCount === 0) return;
+
+  sh.setHiddenGridlines(true);
+  sh.getRange(1, 1, rowCount, colCount)
+    .setFontFamily("Mukta")
+    .setFontSize(10)
+    .setFontColor("#202124")
+    .setBackground("#ffffff")
+    .setVerticalAlignment("middle");
+
+  sh.getRange(1, 1, 1, colCount)
+    .setBackground("#e8f0fe")
+    .setFontWeight("bold")
+    .setBorder(true, true, true, true, false, false, "#dadce0", SpreadsheetApp.BorderStyle.SOLID);
+
+  sh.getRange(1, 3)
+    .setFontColor("#5f6368")
+    .setFontWeight("normal")
+    .setHorizontalAlignment("right");
+
+  sh.getRange(1, 4)
+    .setNumberFormat("m/d/yyyy h:mm")
+    .setFontColor("#5f6368")
+    .setFontWeight("normal")
+    .setHorizontalAlignment("left");
+  styleTierFlagCell_(sh, 1, 2, rows[0][1]);
+
+  sh.getRange(2, 1, 1, colCount)
+    .setBackground("#eeeeee")
+    .setFontWeight("bold")
+    .setBorder(true, false, true, false, false, false, "#d6d9dc", SpreadsheetApp.BorderStyle.SOLID);
+  sh.setColumnWidth(1, 150);
+  sh.setColumnWidth(4, 200);
+  sh.setColumnWidth(5, 150);
+
+  if (rowCount <= 2) return;
+
+  sh.getRange(3, 2, rowCount - 2, 1).setNumberFormat("0.###");
+  sh.getRange(3, 3, rowCount - 2, 1).setNumberFormat("0");
+  sh.getRange(3, 2, rowCount - 2, 2).setHorizontalAlignment("right");
+
+  for (let i = 2; i < rowCount; i++) {
+    const rowNum = i + 1;
+    const row = rows[i];
+
+    if (String(row[0] || "") === "No flagged levels") {
+      sh.getRange(rowNum, 1, 1, colCount)
+        .setBackground("#f5f5f5")
+        .setFontColor("#5f6368")
+        .setFontStyle("italic");
+      continue;
+    }
+
+    const flagText = String(row[3] || "").toLowerCase();
+    sh.getRange(rowNum, 1, 1, colCount)
+      .setBorder(false, false, true, false, false, false, "#eeeeee", SpreadsheetApp.BorderStyle.SOLID);
+
+    sh.getRange(rowNum, 1).setFontWeight("bold");
+
+    sh.getRange(rowNum, 4)
+      .setBackground(flagBackground_(flagText))
+      .setFontWeight("bold");
+
+    if (flagText.indexOf("red book alert") >= 0) {
+      sh.getRange(rowNum, 7).setBackground("#fce8e6").setFontWeight("bold");
+    } else if (flagText.indexOf("green book alert") >= 0) {
+      sh.getRange(rowNum, 7).setBackground("#e6f4ea").setFontWeight("bold");
+    }
+  }
+}
+
+function styleTierFlagCell_(sh, row, col, tierName) {
+  const name = String(tierName || "").trim();
+  if (!name) return;
+
+  const nameToColor = buildTierNameToColor_();
+  const hex = nameToColor[name];
+  if (!hex) return;
+
+  sh.getRange(row, col)
+    .setBackground(hex)
+    .setFontColor(tierTextColor_(name))
+    .setFontWeight("bold");
+}
+
+function flagBackground_(flagText) {
+  if (flagText.indexOf("move alert") >= 0 || flagText.indexOf("placement alert") >= 0) {
+    return "#e6f4ea";
+  }
+  if (flagText.indexOf("low opinion count") >= 0 || flagText.indexOf("red book alert") >= 0) {
+    return "#fce8e6";
+  }
+  if (flagText.indexOf("green book alert") >= 0) {
+    return "#e6f4ea";
+  }
+  return "#fff4cc";
+}
+
+function formatFlagNumber_(value) {
+  const n = Number(value);
+  if (!isFinite(n)) return "";
+  return n.toFixed(3).replace(/\.?0+$/, "");
+}
+
+function formatBookAlert_(alert) {
+  return alert.direction + " book alert (" + formatDifference_(alert) + ")";
+}
+
+function formatDifference_(alert) {
+  if (!alert) return "";
+
+  return "+" +
+    formatFlagNumber_(alert.lean) +
+    " " +
+    alert.tier;
+}
