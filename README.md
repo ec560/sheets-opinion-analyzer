@@ -81,6 +81,7 @@ After pushing, refresh the spreadsheet. A `Tier Tools` menu should appear with t
 - `Setup`
 - `Refresh`
 - `Analyze Selected Level`
+- `Scan Tier Flags`
 
 Run `Setup` once to create the `Tier Analysis` sheet.
 
@@ -98,7 +99,7 @@ Opinion rows begin on `row 2`.
 
 The analyzer depends on cell colors to gather opinion data. The tier is derived from cell colors, and reliability weighting also depends on cell colors rather than text alone. The current tier ordering, difficulty colors, split colors, and reliability mappings are defined in [`src/config.js`](./src/config.js).
 
-One thing to be aware of is that the tier dropdown includes every sheet in the workbook except `Tier Analysis`. If your spreadsheet contains unrelated sheets, they will appear in the selector as well.
+One thing to be aware of is that the tier dropdown includes every sheet in the workbook except analyzer utility sheets like `Tier Analysis` and `Tier Flags`. If your spreadsheet contains unrelated sheets, they will appear in the selector as well.
 
 ## Using the Analyzer
 
@@ -107,6 +108,12 @@ Open the `Tier Analysis` sheet created by setup. Select a tier in cell `B1`, the
 If the source sheet changes and you want to reload the selected level, use the `Tier Tools -> Refresh`. If you only want to rerun the calculations on the currently loaded data, use `Tier Tools -> Analyze Selected Level`.
 
 The output panel includes the selected tier and level, total weighted opinions, weighted top vote and runner-up, mean, median, outliers, standard deviation, split totals, a `Place/Move` decision, and a tier distribution table. When applicable, it also displays `Fuck` opinion percentage and related verdict handling.
+
+### Tier Flag Scan
+
+Use `Tier Tools -> Scan Tier Flags` to scan a full tier sheet at once. If you run it from a tier sheet, that sheet is scanned. If you run it from `Tier Analysis`, the tier selected in `B1` is scanned.
+
+The scan writes a plain `Tier Flags` sheet and only lists levels that need attention. Levels with `0` opinions are ignored. Current flags are: low opinion count, lock alert, red or green book alert when the analyzer's full split distribution leans away from the current tier by at least `1.5` weighted opinions, move alert, and placement alert. If the analyzer's split thresholds are met, the scan reports movement instead of book status.
 
 ## Updating
 
