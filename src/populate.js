@@ -21,6 +21,7 @@ function populateSelectedLevel() {
     return false;
   }
 
+  clearAnalysisArea_();
   setAnalysisStatusMessage_(tool, "Loading..", "#e8f0fe");
 
   const tierSheet = ss.getSheetByName(tierName);

@@ -27,6 +27,7 @@ function analyzeSelectedLevel() {
   const analysis = calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs);
   const {
     weightsByTier,
+    countedRowFlags,
     fuckPresent,
     fuckWeight,
     tierWeightSum,
@@ -161,4 +162,6 @@ function analyzeSelectedLevel() {
     splitMargin,
     splitThreshold
   );
+
+  applyCountedPlayerHighlights_(tool, DATA_START_ROW, bgs, countedRowFlags);
 }

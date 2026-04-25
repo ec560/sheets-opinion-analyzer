@@ -17,6 +17,16 @@ function applyTierSheetColor_(tool, r0, c0, outRowCount) {
     .setFontWeight("bold");
 }
 
+function applyCountedPlayerHighlights_(tool, startRow, sourceBackgrounds, countedRowFlags) {
+  if (!sourceBackgrounds || sourceBackgrounds.length === 0) return;
+
+  const fills = sourceBackgrounds.map((row, idx) => {
+    return [countedRowFlags && countedRowFlags[idx] ? COUNTED_PLAYER_HIGHLIGHT : "#ffffff"];
+  });
+
+  tool.getRange(startRow, 1, fills.length, 1).setBackgrounds(fills);
+}
+
 function trimFixed_(value, digits) {
   return Number(value).toFixed(digits).replace(/\.?0+$/, "");
 }

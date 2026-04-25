@@ -71,8 +71,8 @@ function buildTierFlagScan_(tierName, tierSheet) {
     );
     if (analysis.rawCount === 0 && analysis.allAndFuck === 0) return;
 
-    const flags = buildLevelFlags_(analysis);
-    if (flags.length > 0) rows.push(buildTierFlagRow_(analysis, flags));
+    const flagSummary = buildLevelFlagSummary_(analysis);
+    if (flagSummary.flags.length > 0) rows.push(buildTierFlagRow_(analysis, flagSummary));
   });
 
   return {
@@ -122,42 +122,66 @@ function isBlankFlagOpinionRow_(row) {
     String(row[2]).trim() === "";
 }
 
-function buildLevelFlags_(analysis) {
-  const flags = [];
-
-  if (analysis.allWeight < FLAG_LOW_OPINION_WEIGHT) {
-    flags.push("low opinion count (" + formatFlagNumber_(analysis.allWeight) + "/" + FLAG_LOW_OPINION_WEIGHT + " weight)");
-  }
-
-  if (analysis.isLockWorthy) {
-    flags.push("lock alert (" + (analysis.lockSharePct * 100).toFixed(0) + "% " + analysis.lockSideLabel + ")");
-  }
-
-  if (!analysis.canMove && analysis.bookAlert) {
-    flags.push(formatBookAlert_(analysis.bookAlert));
-  }
+function buildLevelFlagSummary_(analysis) {
+  let flag = "";
+  let differenceAlert = analysis.isLockWorthy ? null : analysis.difference;
+  const lowOpinionFlag =
+    "low opinion count (" +
+    formatFlagNumber_(analysis.allWeight) +
+    "/" +
+    FLAG_SCAN_LOW_OPINION_WEIGHT +
+    " weight)";
+  const needsMoreOpinionsAlert = buildNeedsMoreOpinionsAlert_(analysis);
 
   if (analysis.canMove) {
     if (analysis.isPending) {
-      flags.push("placement alert (" + analysis.verdictTier + ")");
+      flag = "placement alert (" + analysis.verdictTier + ")";
     } else {
       const direction = analysis.moveDirection ? ", " + analysis.moveDirection : "";
-      flags.push("move alert (" + analysis.verdictTier + direction + ")");
+      flag = "move alert (" + analysis.verdictTier + direction + ")";
     }
+  } else if (analysis.isLockWorthy) {
+    flag = "lock alert (" + (analysis.lockSharePct * 100).toFixed(0) + "% " + analysis.lockSideLabel + ")";
+  } else if (analysis.bookAlert) {
+    flag = formatBookAlert_(analysis.bookAlert);
+    differenceAlert = analysis.bookAlert;
+  } else if (needsMoreOpinionsAlert) {
+    flag = "needs more opinions";
+    differenceAlert = needsMoreOpinionsAlert;
+  } else if (analysis.allWeight < FLAG_SCAN_LOW_OPINION_WEIGHT) {
+    flag = lowOpinionFlag;
   }
 
-  return flags;
+  return {
+    flags: flag ? [flag] : [],
+    differenceAlert
+  };
 }
 
-function buildTierFlagRow_(analysis, flags) {
+function buildNeedsMoreOpinionsAlert_(analysis) {
+  if (!analysis || analysis.decisionCurrentIdx < 0 || !analysis.difference) return null;
+  if (analysis.allWeight > FLAG_SCAN_NEEDS_MORE_OPINIONS_MAX_WEIGHT) return null;
+  if (analysis.bookAlert) return null;
+  if (analysis.difference.lean > FLAG_BOOK_LEAN_WEIGHT) return null;
+
+  const currentSide = analysis.decisionCurrentIdx <= analysis.decisionSplitLowIdx ? "left" : "right";
+  const favorsCurrentTier = analysis.difference.lean === 0 || analysis.difference.winningSide === currentSide;
+
+  return {
+    lean: analysis.difference.lean,
+    tier: favorsCurrentTier ? analysis.currentTier : analysis.difference.tier
+  };
+}
+
+function buildTierFlagRow_(analysis, flagSummary) {
   return [
     analysis.levelName,
     formatFlagNumber_(analysis.allWeight),
     analysis.rawCount,
-    flags.join("; "),
+    flagSummary.flags.join("; "),
     analysis.splitLowTier + " / " + analysis.splitHighTier,
     formatFlagNumber_(analysis.splitLeftTotal) + " | " + formatFlagNumber_(analysis.splitRightTotal),
-    analysis.isLockWorthy ? "" : formatDifference_(analysis.difference)
+    formatDifference_(flagSummary.differenceAlert)
   ];
 }
 
@@ -231,8 +255,9 @@ function formatTierFlagScan_(sh, rows, colCount) {
     .setFontWeight("bold")
     .setBorder(true, false, true, false, false, false, "#d6d9dc", SpreadsheetApp.BorderStyle.SOLID);
   sh.setColumnWidth(1, 150);
-  sh.setColumnWidth(4, 200);
-  sh.setColumnWidth(5, 150);
+  sh.setColumnWidth(4, 225);
+  sh.setColumnWidth(5, 160);
+  sh.setColumnWidth(7, 125);
 
   if (rowCount <= 2) return;
 
@@ -266,6 +291,8 @@ function formatTierFlagScan_(sh, rows, colCount) {
       sh.getRange(rowNum, 7).setBackground("#fce8e6").setFontWeight("bold");
     } else if (flagText.indexOf("green book alert") >= 0) {
       sh.getRange(rowNum, 7).setBackground("#e6f4ea").setFontWeight("bold");
+    } else if (flagText.indexOf("needs more opinions") >= 0) {
+      sh.getRange(rowNum, 7).setBackground("#fff4cc").setFontWeight("bold");
     }
   }
 }

@@ -11,10 +11,13 @@ const OUTPUT_START_ROW = 1;
 const OUTPUT_WIDTH = 4;                        // E:H block
 
 const FLAG_LOW_OPINION_WEIGHT = 4;
+const FLAG_SCAN_LOW_OPINION_WEIGHT = 10;
+const FLAG_SCAN_NEEDS_MORE_OPINIONS_MAX_WEIGHT = 20;
 const FLAG_BOOK_LEAN_WEIGHT = 1.5;
 const FLAG_LOCK_SHARE = 0.75;
 const FLAG_LOCK_MIN_RAW_COUNT = 50;
 const FLAG_LOCK_MIN_WEIGHT = 50;
+const COUNTED_PLAYER_HIGHLIGHT = "#e6f4ea";
 
 function isAnalyzerUtilitySheetName_(name) {
   return name === ANALYSIS_SHEET_NAME || name === FLAG_SCAN_SHEET_NAME;

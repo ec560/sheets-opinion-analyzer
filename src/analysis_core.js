@@ -7,6 +7,7 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
   let totalWeight = 0;
   let rawCount = 0;
   const rawPoints = [];
+  const countedRowFlags = new Array(vals.length).fill(false);
 
   const tierIdxOf = (name) => orderedTierNames.indexOf(name);
   const addTierWeight = (tier, wt) => {
@@ -43,6 +44,7 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
 
         if (i1 >= 0 && i2 >= 0) rawPoints.push((i1 + i2) / 2);
         if (lowTier && highTier) {
+          countedRowFlags[r] = true;
           const halfW = w / 2;
           addTierWeight(lowTier, halfW);
           addTierWeight(highTier, halfW);
@@ -55,6 +57,7 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
       if (fontTier && fontTier !== "Insane") {
         const it = tierIdxOf(fontTier);
         if (it >= 0) rawPoints.push(it);
+        countedRowFlags[r] = true;
         addTierWeight(fontTier, w);
         totalWeight += w;
         continue;
@@ -63,6 +66,7 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
       if (String(opinionText).toLowerCase().includes("insane")) {
         const it = tierIdxOf("Insane");
         if (it >= 0) rawPoints.push(it);
+        countedRowFlags[r] = true;
         addTierWeight("Insane", w);
         totalWeight += w;
         continue;
@@ -77,6 +81,7 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
       const it = tierIdxOf(tName);
       if (it >= 0) rawPoints.push(it);
 
+      countedRowFlags[r] = true;
       addTierWeight(tName, w);
       rawCount++;
       totalWeight += w;
@@ -95,6 +100,7 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
 
       if (i1 >= 0 && i2 >= 0) rawPoints.push((i1 + i2) / 2);
       if (t1 && t2) {
+        countedRowFlags[r] = true;
         const halfW = w / 2;
         addTierWeight(t1, halfW);
         addTierWeight(t2, halfW);
@@ -319,6 +325,7 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     tierName,
     levelName,
     weightsByTier,
+    countedRowFlags,
     rawPoints,
     rawCount,
     rawMeanIdx,

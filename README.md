@@ -111,9 +111,9 @@ The output panel includes the selected tier and level, total weighted opinions, 
 
 ### Tier Flag Scan
 
-Use `Tier Tools -> Scan Tier Flags` to scan a full tier sheet at once. If you run it from a tier sheet, that sheet is scanned. If you run it from `Tier Analysis`, the tier selected in `B1` is scanned.
+Use `Tier Tools -> Scan Tier Flags` to scan a full tier sheet at once. If you run it from a tier sheet, that sheet is scanned. If you run it from `Tier Analysis` (or anywhere else), the tier selected in `B1` is scanned.
 
-The scan writes a plain `Tier Flags` sheet and only lists levels that need attention. Levels with `0` opinions are ignored. Current flags are: low opinion count, lock alert, red or green book alert when the analyzer's full split distribution leans away from the current tier by at least `1.5` weighted opinions, move alert, and placement alert. If the analyzer's split thresholds are met, the scan reports movement instead of book status.
+The scan writes to a `Tier Flags` sheet and only lists levels that might require attention. Levels with `0` opinions are ignored. Current flags are: low opinion count, lock alert, red or green book alert (when the analyzer's full split distribution leans away from the current tier by at least `1.5` weighted opinions), move alert, and placement alert. If the analyzer's split thresholds are met, the scan reports movement instead of book status.
 
 ## Updating
 
