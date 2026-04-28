@@ -61,7 +61,9 @@ function resolvePlaceMoveFailure_(ctx) {
     passesSplitPct,
     splitMarginPct,
     splitMargin,
-    verdictBaseName
+    verdictBaseName,
+    passesFuckPlacementMargin,
+    fuckPlacementMargin
   } = ctx;
 
   const splitNotDecisiveMessage = buildSplitNotDecisiveMessage_(splitMargin, verdictBaseName);
@@ -105,6 +107,12 @@ function resolvePlaceMoveFailure_(ctx) {
 
   if (!passesMajority) {
     return { text: "Needs more opinions" };
+  }
+
+  if (!passesFuckPlacementMargin) {
+    return {
+      text: buildSplitNotDecisiveMessage_(Math.abs(fuckPlacementMargin), verdictBaseName)
+    };
   }
 
   if (!passesSplitPct && verdictDiffersFromCurrent) {
@@ -159,7 +167,9 @@ function formatAnalysisOutput_(
   passesSplitPct,
   splitMarginPct,
   splitMargin,
-  splitThreshold
+  splitThreshold,
+  passesFuckPlacementMargin,
+  fuckPlacementMargin
 ) {
   const r0 = OUTPUT_START_ROW;
   const c0 = OUTPUT_COL;
@@ -294,11 +304,14 @@ function formatAnalysisOutput_(
   if (meetsRow >= 0) {
     const r = r0 + meetsRow;
     const val = tool.getRange(r, c0 + 1).getDisplayValue().toUpperCase();
+    const msgRange = tool.getRange(r, c0 + 2, 1, 2);
+    const msgCell = tool.getRange(r, c0 + 2);
 
     tool.getRange(r, c0, 1, OUTPUT_WIDTH)
       .setBackground(val === "YES" ? "#e6f4ea" : "#fce8e6");
 
     if (val === "YES") {
+      tool.getRange(r, c0 + 2, 1, 2).breakApart();
       const verdictCell = tool.getRange(r, c0 + 3);
       verdictCell
         .setHorizontalAlignment("center")
@@ -307,11 +320,11 @@ function formatAnalysisOutput_(
 
     tool.getRange(r, c0 + 1).setFontWeight("bold");
 
-    const msgCell = tool.getRange(r, c0 + 3);
-    msgCell.setFontWeight("bold");
-
     if (val !== "YES") {
-      msgCell.setValue("");
+      if (!msgRange.isPartOfMerge()) msgRange.mergeAcross();
+      msgCell
+        .setValue("")
+        .setFontWeight("bold");
 
       const failure = resolvePlaceMoveFailure_({
         isPending,
@@ -329,7 +342,9 @@ function formatAnalysisOutput_(
         passesSplitPct,
         splitMarginPct,
         splitMargin,
-        verdictBaseName
+        verdictBaseName,
+        passesFuckPlacementMargin,
+        fuckPlacementMargin
       });
 
       msgCell.setValue(failure.text);

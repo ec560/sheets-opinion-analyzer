@@ -65,6 +65,8 @@ function analyzeSelectedLevel() {
     splitMarginPct,
     splitMargin,
     splitThreshold,
+    fuckPlacementMargin,
+    passesFuckPlacementMargin,
     currentTier
   } = analysis;
 
@@ -160,7 +162,9 @@ function analyzeSelectedLevel() {
     passesSplitPct,
     splitMarginPct,
     splitMargin,
-    splitThreshold
+    splitThreshold,
+    passesFuckPlacementMargin,
+    fuckPlacementMargin
   );
 
   applyCountedPlayerHighlights_(tool, DATA_START_ROW, bgs, countedRowFlags);

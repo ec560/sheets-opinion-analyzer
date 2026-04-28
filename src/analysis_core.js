@@ -259,6 +259,12 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
   const passesSplitPct = isPending ? (splitMarginPct >= 0.20) : (splitMarginPct >= 0.05);
   const verdictIdx = (decisionSplitLeftTotal > decisionSplitRightTotal) ? decisionSplitLowIdx : decisionSplitHighIdx;
   const verdictBaseName = decisionOrderedTierNames[verdictIdx];
+  const decisionWinningSideTotal = verdictIdx === decisionSplitLowIdx
+    ? decisionSplitLeftTotal
+    : decisionSplitRightTotal;
+  const requiresFuckPlacementMargin = fuckPresent && verdictTier !== "Fuck";
+  const fuckPlacementMargin = decisionWinningSideTotal - fuckWeight;
+  const passesFuckPlacementMargin = !requiresFuckPlacementMargin || fuckPlacementMargin >= splitThreshold;
 
   let canMove = false;
   if (fuckPresent) {
@@ -279,6 +285,10 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     verdictDiffersFromCurrent
   ) {
     canMove = true;
+  }
+
+  if (canMove && !passesFuckPlacementMargin) {
+    canMove = false;
   }
 
   let verdictTierName = verdictTier;
@@ -378,6 +388,10 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     splitMarginPct,
     passesSplitMajority,
     passesSplitPct,
+    decisionWinningSideTotal,
+    requiresFuckPlacementMargin,
+    fuckPlacementMargin,
+    passesFuckPlacementMargin,
     verdictIdx,
     verdictBaseName,
     verdictTierName,
