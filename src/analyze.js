@@ -45,10 +45,10 @@ function analyzeSelectedLevel() {
     topWeight,
     secondTier,
     secondWeight,
-    splitLowTier,
-    splitHighTier,
-    splitLeftTotal,
-    splitRightTotal,
+    displaySplitLowTier,
+    displaySplitHighTier,
+    displaySplitLeftTotal,
+    displaySplitRightTotal,
     toppct,
     fuckpct,
     passesMajority,
@@ -94,9 +94,9 @@ function analyzeSelectedLevel() {
 
   out.push([
     `Split`,
-    `${splitLowTier}`,
-    `${splitHighTier}`,
-    `${upTo3dec_(splitLeftTotal)} | ${upTo3dec_(splitRightTotal)}`
+    `${displaySplitLowTier}`,
+    `${displaySplitHighTier}`,
+    `${upTo3dec_(displaySplitLeftTotal)} | ${upTo3dec_(displaySplitRightTotal)}`
   ]);
 
   out.push(["", "", "", ""]);
@@ -139,8 +139,8 @@ function analyzeSelectedLevel() {
     topTier,
     topWeight,
     secondTier,
-    splitLowTier,
-    splitHighTier,
+    displaySplitLowTier,
+    displaySplitHighTier,
     passesMajority,
     passesSplitMajority,
     verdictDiffersFromCurrent,

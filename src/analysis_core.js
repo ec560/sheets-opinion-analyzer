@@ -262,9 +262,32 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
   const decisionWinningSideTotal = verdictIdx === decisionSplitLowIdx
     ? decisionSplitLeftTotal
     : decisionSplitRightTotal;
+  const decisionLosingSideTotal = verdictIdx === decisionSplitLowIdx
+    ? decisionSplitRightTotal
+    : decisionSplitLeftTotal;
   const requiresFuckPlacementMargin = fuckPresent && verdictTier !== "Fuck";
   const fuckPlacementMargin = decisionWinningSideTotal - fuckWeight;
   const passesFuckPlacementMargin = !requiresFuckPlacementMargin || fuckPlacementMargin >= splitThreshold;
+  const showsFuckPlacementSplit = requiresFuckPlacementMargin && fuckWeight > decisionLosingSideTotal;
+
+  let displaySplitLowTier = splitLowTier;
+  let displaySplitHighTier = splitHighTier;
+  let displaySplitLeftTotal = splitLeftTotal;
+  let displaySplitRightTotal = splitRightTotal;
+
+  if (showsFuckPlacementSplit) {
+    if (verdictIdx === decisionSplitLowIdx) {
+      displaySplitLowTier = verdictBaseName;
+      displaySplitHighTier = "Fuck";
+      displaySplitLeftTotal = decisionWinningSideTotal;
+      displaySplitRightTotal = fuckWeight;
+    } else {
+      displaySplitLowTier = "Fuck";
+      displaySplitHighTier = verdictBaseName;
+      displaySplitLeftTotal = fuckWeight;
+      displaySplitRightTotal = decisionWinningSideTotal;
+    }
+  }
 
   let canMove = false;
   if (fuckPresent) {
@@ -369,6 +392,10 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     splitHighTier,
     splitLeftTotal,
     splitRightTotal,
+    displaySplitLowTier,
+    displaySplitHighTier,
+    displaySplitLeftTotal,
+    displaySplitRightTotal,
     currentTier,
     currentIdx,
     isPending,
@@ -389,9 +416,11 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     passesSplitMajority,
     passesSplitPct,
     decisionWinningSideTotal,
+    decisionLosingSideTotal,
     requiresFuckPlacementMargin,
     fuckPlacementMargin,
     passesFuckPlacementMargin,
+    showsFuckPlacementSplit,
     verdictIdx,
     verdictBaseName,
     verdictTierName,
