@@ -33,6 +33,7 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
       fuckPresent = true;
       rawCount++;
       fuckWeight += w;
+      countedRowFlags[r] = true;
 
       const fontKey = hex_(opinionFont);
       if (splitPairs[fontKey]) {
