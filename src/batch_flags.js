@@ -125,13 +125,8 @@ function isBlankFlagOpinionRow_(row) {
 function buildLevelFlagSummary_(analysis) {
   let flag = "";
   let differenceAlert = analysis.isLockWorthy ? null : analysis.difference;
-  const lowOpinionFlag =
-    "low opinion count (" +
-    formatFlagNumber_(analysis.allWeight) +
-    "/" +
-    FLAG_SCAN_LOW_OPINION_WEIGHT +
-    " weight)";
   const needsMoreOpinionsAlert = buildNeedsMoreOpinionsAlert_(analysis);
+  const lowOpinionAlert = buildLowOpinionAlert_(analysis);
 
   if (analysis.canMove) {
     if (analysis.isPending) {
@@ -148,14 +143,46 @@ function buildLevelFlagSummary_(analysis) {
   } else if (needsMoreOpinionsAlert) {
     flag = "needs more opinions";
     differenceAlert = needsMoreOpinionsAlert;
-  } else if (analysis.allWeight < FLAG_SCAN_LOW_OPINION_WEIGHT) {
-    flag = lowOpinionFlag;
+  } else if (lowOpinionAlert) {
+    flag = lowOpinionAlert.text;
   }
 
   return {
     flags: flag ? [flag] : [],
-    differenceAlert
+    differenceAlert,
+    subduedLowOpinion: !!(lowOpinionAlert && lowOpinionAlert.subdued && flag === lowOpinionAlert.text)
   };
+}
+
+function buildLowOpinionAlert_(analysis) {
+  if (!analysis) return null;
+
+  const rawCountIsLow = analysis.rawCount <= FLAG_SCAN_LOW_OPINION_MAX_RAW_COUNT;
+  const weightIsLow = analysis.allWeight < FLAG_SCAN_LOW_OPINION_WEIGHT;
+  const strongCurrentTierLean = hasStrongCurrentTierLean_(analysis);
+
+  if (!rawCountIsLow && (!weightIsLow || strongCurrentTierLean)) return null;
+
+  return {
+    text: formatLowOpinionFlag_(analysis),
+    subdued: rawCountIsLow && strongCurrentTierLean
+  };
+}
+
+function hasStrongCurrentTierLean_(analysis) {
+  if (!analysis || analysis.decisionCurrentIdx < 0 || !analysis.difference) return false;
+
+  const currentSide = analysis.decisionCurrentIdx <= analysis.decisionSplitLowIdx ? "left" : "right";
+  return analysis.difference.winningSide === currentSide &&
+    analysis.difference.lean >= FLAG_SCAN_LOW_OPINION_CURRENT_LEAN;
+}
+
+function formatLowOpinionFlag_(analysis) {
+  return "low opinion count (" +
+    formatFlagNumber_(analysis.allWeight) +
+    "/" +
+    FLAG_SCAN_LOW_OPINION_WEIGHT +
+    " weight)";
 }
 
 function buildNeedsMoreOpinionsAlert_(analysis) {
@@ -174,15 +201,18 @@ function buildNeedsMoreOpinionsAlert_(analysis) {
 }
 
 function buildTierFlagRow_(analysis, flagSummary) {
-  return [
-    analysis.levelName,
-    formatFlagNumber_(analysis.allWeight),
-    analysis.rawCount,
-    flagSummary.flags.join("; "),
-    analysis.splitLowTier + " / " + analysis.splitHighTier,
-    formatFlagNumber_(analysis.splitLeftTotal) + " | " + formatFlagNumber_(analysis.splitRightTotal),
-    formatDifference_(flagSummary.differenceAlert)
-  ];
+  return {
+    values: [
+      analysis.levelName,
+      formatFlagNumber_(analysis.allWeight),
+      analysis.rawCount,
+      flagSummary.flags.join("; "),
+      analysis.splitLowTier + " / " + analysis.splitHighTier,
+      formatFlagNumber_(analysis.splitLeftTotal) + " | " + formatFlagNumber_(analysis.splitRightTotal),
+      formatDifference_(flagSummary.differenceAlert)
+    ],
+    subduedLowOpinion: !!flagSummary.subduedLowOpinion
+  };
 }
 
 function renderTierFlagScan_(ss, tierName, flagRows) {
@@ -209,7 +239,7 @@ function renderTierFlagScan_(ss, tierName, flagRows) {
 
   const rows = [titleRow, headers];
   if (flagRows.length > 0) {
-    flagRows.forEach(row => rows.push(row));
+    flagRows.forEach(row => rows.push(row.values));
   } else {
     const emptyRow = new Array(headers.length).fill("");
     emptyRow[0] = "No flagged levels";
@@ -217,13 +247,17 @@ function renderTierFlagScan_(ss, tierName, flagRows) {
   }
 
   sh.getRange(1, 1, rows.length, headers.length).setValues(rows);
-  formatTierFlagScan_(sh, rows, headers.length);
+  formatTierFlagScan_(sh, rows, headers.length, flagRows);
   return sh;
 }
 
-function formatTierFlagScan_(sh, rows, colCount) {
+function formatTierFlagScan_(sh, rows, colCount, flagRows) {
   const rowCount = rows.length;
   if (rowCount === 0 || colCount === 0) return;
+  const subduedLowOpinionBg = "#f3f3f3";
+  const subduedLowOpinionText = "#5f6368";
+  const subduedLowOpinionDiffBg = "#fafafa";
+  const subduedLowOpinionDiffText = "#6f7277";
 
   sh.setHiddenGridlines(true);
   sh.getRange(1, 1, rowCount, colCount)
@@ -268,6 +302,8 @@ function formatTierFlagScan_(sh, rows, colCount) {
   for (let i = 2; i < rowCount; i++) {
     const rowNum = i + 1;
     const row = rows[i];
+    const flagRow = flagRows && flagRows.length > (i - 2) ? flagRows[i - 2] : null;
+    const subduedLowOpinion = !!(flagRow && flagRow.subduedLowOpinion);
 
     if (String(row[0] || "") === "No flagged levels") {
       sh.getRange(rowNum, 1, 1, colCount)
@@ -278,21 +314,43 @@ function formatTierFlagScan_(sh, rows, colCount) {
     }
 
     const flagText = String(row[3] || "").toLowerCase();
+    const differenceCell = sh.getRange(rowNum, 7);
     sh.getRange(rowNum, 1, 1, colCount)
       .setBorder(false, false, true, false, false, false, "#eeeeee", SpreadsheetApp.BorderStyle.SOLID);
 
-    sh.getRange(rowNum, 1).setFontWeight("bold");
+    sh.getRange(rowNum, 1).setFontWeight(subduedLowOpinion ? "normal" : "bold");
 
-    sh.getRange(rowNum, 4)
-      .setBackground(flagBackground_(flagText))
-      .setFontWeight("bold");
+    const flagCell = sh.getRange(rowNum, 4);
+    if (subduedLowOpinion) {
+      flagCell
+        .setBackground(subduedLowOpinionBg)
+        .setFontColor(subduedLowOpinionText)
+        .setFontWeight("normal");
+    } else if (flagText.indexOf("low opinion count") >= 0) {
+      flagCell
+        .setBackground("#fce8e6")
+        .setFontColor("#b71c1c")
+        .setFontWeight("bold");
+    } else {
+      flagCell
+        .setBackground(flagBackground_(flagText))
+        .setFontColor("#202124")
+        .setFontWeight("bold");
+    }
 
-    if (flagText.indexOf("red book alert") >= 0) {
-      sh.getRange(rowNum, 7).setBackground("#fce8e6").setFontWeight("bold");
-    } else if (flagText.indexOf("green book alert") >= 0) {
-      sh.getRange(rowNum, 7).setBackground("#e6f4ea").setFontWeight("bold");
-    } else if (flagText.indexOf("needs more opinions") >= 0) {
-      sh.getRange(rowNum, 7).setBackground("#fff4cc").setFontWeight("bold");
+    if (!subduedLowOpinion) {
+      if (flagText.indexOf("red book alert") >= 0) {
+        differenceCell.setBackground("#fce8e6").setFontWeight("bold");
+      } else if (flagText.indexOf("green book alert") >= 0) {
+        differenceCell.setBackground("#e6f4ea").setFontWeight("bold");
+      } else if (flagText.indexOf("needs more opinions") >= 0) {
+        differenceCell.setBackground("#fce8e6").setFontWeight("bold");
+      }
+    } else {
+      differenceCell
+        .setBackground(subduedLowOpinionDiffBg)
+        .setFontColor(subduedLowOpinionDiffText)
+        .setFontWeight("normal");
     }
   }
 }
@@ -315,7 +373,11 @@ function flagBackground_(flagText) {
   if (flagText.indexOf("move alert") >= 0 || flagText.indexOf("placement alert") >= 0) {
     return "#e6f4ea";
   }
-  if (flagText.indexOf("low opinion count") >= 0 || flagText.indexOf("red book alert") >= 0) {
+  if (
+    flagText.indexOf("low opinion count") >= 0 ||
+    flagText.indexOf("red book alert") >= 0 ||
+    flagText.indexOf("needs more opinions") >= 0
+  ) {
     return "#fce8e6";
   }
   if (flagText.indexOf("green book alert") >= 0) {

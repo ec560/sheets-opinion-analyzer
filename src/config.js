@@ -2,7 +2,7 @@
 
 const ANALYSIS_SHEET_NAME = "Tier Analysis";
 const FLAG_SCAN_SHEET_NAME = "Tier Flags";
-const VERSION = "v1.4.1";
+const VERSION = "v1.4.2-beta";
 const TIER_CELL = "B1";
 const LEVEL_CELL = "B2";
 const DATA_START_ROW = 4;                      // where A:C gets populated
@@ -12,6 +12,8 @@ const OUTPUT_WIDTH = 4;                        // E:H block
 
 const FLAG_LOW_OPINION_WEIGHT = 4;
 const FLAG_SCAN_LOW_OPINION_WEIGHT = 10;
+const FLAG_SCAN_LOW_OPINION_MAX_RAW_COUNT = 8;
+const FLAG_SCAN_LOW_OPINION_CURRENT_LEAN = 3;
 const FLAG_SCAN_NEEDS_MORE_OPINIONS_MAX_WEIGHT = 20;
 const FLAG_BOOK_LEAN_WEIGHT = 1.5;
 const FLAG_LOCK_SHARE = 0.75;
