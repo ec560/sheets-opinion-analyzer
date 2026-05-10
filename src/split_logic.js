@@ -42,8 +42,9 @@ function pickSplitLowIdx_(orderedTierNames, weightsByTier, topIdx, runnerIdx, cu
     return candidates.length ? candidates[0].lowIdx : Math.max(0, Math.min(n - 2, currentIdx));
   }
 
-  // adjacent top/runner forced, else pick boundary adjacent to top that best balances the split
-  if (areAdjacent(topIdx, runnerIdx)) return Math.min(topIdx, runnerIdx);
+  // Placed levels: adjacent top/runner forced
+  // Pending levels: closer side around the winning tier
+  if (!isPending && areAdjacent(topIdx, runnerIdx)) return Math.min(topIdx, runnerIdx);
 
   const candidates = [];
 
