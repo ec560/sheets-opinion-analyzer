@@ -172,7 +172,7 @@ function buildLowOpinionAlert_(analysis) {
 function hasStrongCurrentTierLean_(analysis) {
   if (!analysis || analysis.decisionCurrentIdx < 0 || !analysis.difference) return false;
 
-  const currentSide = analysis.decisionCurrentIdx <= analysis.decisionSplitLowIdx ? "left" : "right";
+  const currentSide = analysis.decisionCurrentIdx <= analysis.decisionTierSplit.lowIndex ? "left" : "right";
   return analysis.difference.winningSide === currentSide &&
     analysis.difference.lean >= FLAG_SCAN_LOW_OPINION_CURRENT_LEAN;
 }
@@ -191,7 +191,7 @@ function buildNeedsMoreOpinionsAlert_(analysis) {
   if (analysis.bookAlert) return null;
   if (analysis.difference.lean > FLAG_BOOK_LEAN_WEIGHT) return null;
 
-  const currentSide = analysis.decisionCurrentIdx <= analysis.decisionSplitLowIdx ? "left" : "right";
+  const currentSide = analysis.decisionCurrentIdx <= analysis.decisionTierSplit.lowIndex ? "left" : "right";
   const favorsCurrentTier = analysis.difference.lean === 0 || analysis.difference.winningSide === currentSide;
 
   return {
@@ -207,8 +207,8 @@ function buildTierFlagRow_(analysis, flagSummary) {
       formatFlagNumber_(analysis.allWeight),
       analysis.rawCount,
       flagSummary.flags.join("; "),
-      analysis.splitLowTier + " / " + analysis.splitHighTier,
-      formatFlagNumber_(analysis.splitLeftTotal) + " | " + formatFlagNumber_(analysis.splitRightTotal),
+      analysis.tierSplit.left.label + " / " + analysis.tierSplit.right.label,
+      formatFlagNumber_(analysis.tierSplit.left.weight) + " | " + formatFlagNumber_(analysis.tierSplit.right.weight),
       formatDifference_(flagSummary.differenceAlert)
     ],
     subduedLowOpinion: !!flagSummary.subduedLowOpinion

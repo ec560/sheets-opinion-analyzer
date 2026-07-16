@@ -36,7 +36,7 @@ function buildSplitNotDecisiveMessage_(splitMargin, verdictBaseName) {
 }
 
 function buildLowSplitMarginMessage_(splitMarginPct, isPending) {
-  const requiredPct = isPending ? 0.20 : 0.05;
+  const requiredPct = 0.05;
   return "Low split margin (" +
     (splitMarginPct * 100).toFixed(0) +
     "% ; " +
@@ -46,94 +46,45 @@ function buildLowSplitMarginMessage_(splitMarginPct, isPending) {
 
 function resolvePlaceMoveFailure_(ctx) {
   const {
-    isPending,
-    passesMajority,
-    passesSplitMajority,
-    verdictDiffersFromCurrent,
-    fuckPresent,
-    sd,
-    toppct,
-    fuckpct,
-    minimumOpinionWeight,
-    rawOpinionCount,
     lockSharePct,
-    totalWeightedOpinions,
-    passesSplitPct,
-    splitMarginPct,
-    splitMargin,
     verdictBaseName,
-    passesFuckPlacementMargin,
-    fuckPlacementMargin
+    placementComparison,
+    moveFailureReason
   } = ctx;
 
-  const splitNotDecisiveMessage = buildSplitNotDecisiveMessage_(splitMargin, verdictBaseName);
-  const MIN_TOTAL_OPINIONS_TO_PLACE = 4;
-  if (totalWeightedOpinions < MIN_TOTAL_OPINIONS_TO_PLACE) {
-    return { text: "Needs more opinions" };
-  }
-
-  const startsInFuckMode = !!(fuckPresent && (fuckpct >= 0.5 || toppct < 0.35));
-  const fuckRuleByShare = fuckpct >= 0.2;
-  const fuckRuleByVolatility = sd >= 2;
-  const inFuckMode = startsInFuckMode && (fuckRuleByShare || fuckRuleByVolatility);
-
-  if (inFuckMode) {
-    if (isPending && !passesMajority) {
+  const comparisonLabel = placementComparison.decisionLabel || verdictBaseName;
+  const splitNotDecisiveMessage = buildSplitNotDecisiveMessage_(
+    placementComparison.marginWeight,
+    comparisonLabel
+  );
+  switch (moveFailureReason) {
+    case "needs_more_opinions":
       return { text: "Needs more opinions" };
-    }
-
-    if (!verdictDiffersFromCurrent || fuckpct >= 0.5) {
+    case "no_movement_f":
       return { text: "No movement necessary (F)", bg: "#efefef" };
-    }
-
-    if (!passesSplitMajority && fuckRuleByVolatility) {
+    case "split_not_decisive_f":
       return { text: "Split not decisive (F)" };
-    }
-
-    return { text: "Rules not met (F)" };
+    case "fuck_rules_not_met":
+      return { text: "Rules not met (F)" };
+    case "split_not_decisive":
+      return { text: splitNotDecisiveMessage };
+    case "fuck_placement_not_decisive":
+      return { text: splitNotDecisiveMessage };
+    case "low_split_margin":
+      return {
+        text: buildLowSplitMarginMessage_(placementComparison.marginPct, ctx.isPending),
+        bg: "#ffdfcc"
+      };
+    case "lock_threshold_met":
+      return {
+        text: "Lock threshold met (" + (lockSharePct * 100).toFixed(0) + "%)",
+        bg: "#e6f4ea"
+      };
+    case "no_movement":
+      return { text: "No movement necessary", bg: "#efefef" };
+    default:
+      return { text: "Rules not met (please tell opayc)" };
   }
-
-  if (isPending && !passesSplitMajority) {
-    return { text: splitNotDecisiveMessage };
-  }
-
-  if (isPending && !passesMajority) {
-    return { text: "Needs more opinions" };
-  }
-
-  if (!passesSplitMajority) {
-    return { text: splitNotDecisiveMessage };
-  }
-
-  if (!passesMajority) {
-    return { text: "Needs more opinions" };
-  }
-
-  if (!passesFuckPlacementMargin) {
-    return {
-      text: buildSplitNotDecisiveMessage_(Math.abs(fuckPlacementMargin), verdictBaseName)
-    };
-  }
-
-  if (!passesSplitPct && verdictDiffersFromCurrent) {
-    return {
-      text: buildLowSplitMarginMessage_(splitMarginPct, isPending),
-      bg: "#ffdfcc"
-    };
-  }
-
-  if (lockSharePct >= 0.75 && rawOpinionCount >= 50 && totalWeightedOpinions >= 50) {
-    return {
-      text: "Lock threshold met (" + (lockSharePct * 100).toFixed(0) + "%)",
-      bg: "#e6f4ea"
-    };
-  }
-
-  if (!verdictDiffersFromCurrent) {
-    return { text: "No movement necessary", bg: "#efefef" };
-  }
-
-  return { text: "Rules not met (please tell opayc)" };
 }
 
 function formatAnalysisOutput_(
@@ -144,8 +95,7 @@ function formatAnalysisOutput_(
   topTier,
   topWeight,
   runnerTier,
-  splitLowTier,
-  splitHighTier,
+  placementComparison,
   passesMajority,
   passesSplitMajority,
   verdictDiffersFromCurrent,
@@ -165,11 +115,8 @@ function formatAnalysisOutput_(
   lockSharePct,
   totalWeightedOpinions,
   passesSplitPct,
-  splitMarginPct,
-  splitMargin,
   splitThreshold,
-  passesFuckPlacementMargin,
-  fuckPlacementMargin
+  moveFailureReason
 ) {
   const r0 = OUTPUT_START_ROW;
   const c0 = OUTPUT_COL;
@@ -340,11 +287,9 @@ function formatAnalysisOutput_(
         lockSharePct,
         totalWeightedOpinions,
         passesSplitPct,
-        splitMarginPct,
-        splitMargin,
         verdictBaseName,
-        passesFuckPlacementMargin,
-        fuckPlacementMargin
+        placementComparison,
+        moveFailureReason
       });
 
       msgCell.setValue(failure.text);
@@ -363,18 +308,18 @@ function formatAnalysisOutput_(
       .setBackground("#fff4cc")
       .setVerticalAlignment("middle");
 
-    if (nameToColor[splitLowTier]) {
+    if (nameToColor[placementComparison.left.label]) {
       tool.getRange(r, c0 + 1)
-        .setBackground(nameToColor[splitLowTier])
-        .setFontColor(tierTextColor_(splitLowTier))
+        .setBackground(nameToColor[placementComparison.left.label])
+        .setFontColor(tierTextColor_(placementComparison.left.label))
         .setHorizontalAlignment("right")
         .setVerticalAlignment("middle");
     }
 
-    if (nameToColor[splitHighTier]) {
+    if (nameToColor[placementComparison.right.label]) {
       tool.getRange(r, c0 + 2)
-        .setBackground(nameToColor[splitHighTier])
-        .setFontColor(tierTextColor_(splitHighTier))
+        .setBackground(nameToColor[placementComparison.right.label])
+        .setFontColor(tierTextColor_(placementComparison.right.label))
         .setHorizontalAlignment("left")
         .setVerticalAlignment("middle");
     }

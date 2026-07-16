@@ -154,12 +154,6 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
   const outlierPctObj = outlierPct_(rawPoints, rawMeanIdx, outlierK);
   const outlierBounds = outlierCutoffLabels_(orderedTierNames, rawMeanIdx, outlierK);
 
-  const sumRange = (names, weightMap, startIdx, endIdx) => {
-    let s = 0;
-    for (let i = startIdx; i <= endIdx; i++) s += (weightMap[names[i]] || 0);
-    return s;
-  };
-
   const currentTier = String(tierName || "").trim();
   const currentIdx = orderedTierNames.indexOf(currentTier);
   const isPending = currentTier.toLowerCase() === "pending";
@@ -174,11 +168,18 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     rawMedianIdx,
     isPending
   );
-  const splitHighIdx = splitLowIdx + 1;
-  const splitLowTier = orderedTierNames[splitLowIdx];
-  const splitHighTier = orderedTierNames[splitHighIdx];
-  const splitLeftTotal = sumRange(orderedTierNames, weightsByTier, 0, splitLowIdx);
-  const splitRightTotal = sumRange(orderedTierNames, weightsByTier, splitHighIdx, orderedTierNames.length - 1);
+  let splitThreshold = 3;
+  if (allWeight >= 50 && allWeight < 100) splitThreshold = 4;
+  else if (allWeight >= 100) splitThreshold = 5;
+  const requiredSplitPct = 0.05;
+  const tierSplit = buildTierSplit_(
+    orderedTierNames,
+    weightsByTier,
+    splitLowIdx,
+    totalWeight,
+    splitThreshold,
+    requiredSplitPct
+  );
 
   const decisionTierName = (name) => {
     return (name === "Beginner" || name === "Insane Demon") ? "Beginner" : name;
@@ -215,15 +216,15 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     decisionCenterIdx,
     isPending
   );
-  const decisionSplitHighIdx = decisionSplitLowIdx + 1;
-  const decisionSplitLeftTotal = sumRange(decisionOrderedTierNames, decisionWeightsByTier, 0, decisionSplitLowIdx);
-  const decisionSplitRightTotal = sumRange(
+  const decisionTierSplit = buildTierSplit_(
     decisionOrderedTierNames,
     decisionWeightsByTier,
-    decisionSplitHighIdx,
-    decisionOrderedTierNames.length - 1
+    decisionSplitLowIdx,
+    totalWeight,
+    splitThreshold,
+    requiredSplitPct
   );
-  const decisionLockSideTotal = Math.max(decisionSplitLeftTotal, decisionSplitRightTotal);
+  const decisionLockSideTotal = decisionTierSplit.winner.weight;
   const lockSharePct = allWeight > 0 ? decisionLockSideTotal / allWeight : 0;
   const isLockWorthy = lockSharePct >= FLAG_LOCK_SHARE &&
     rawCount >= FLAG_LOCK_MIN_RAW_COUNT &&
@@ -233,91 +234,46 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
   const fuckpct = allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0;
   const hasMinimumTotalOpinions = allWeight >= FLAG_LOW_OPINION_WEIGHT;
   const passesMajority = hasMinimumTotalOpinions;
+  const fuckRules = evaluateFuckRules_(fuckPresent, fuckpct, toppct, sd, passesMajority);
 
-  let verdictTier = "";
-  if (fuckPresent) {
-    if ((((fuckpct >= 0.2 && toppct < 0.35) || fuckpct >= 0.5) || (sd >= 2 && passesMajority))) {
-      verdictTier = "Fuck";
-    } else {
-      verdictTier = (decisionSplitLeftTotal > decisionSplitRightTotal)
-        ? decisionOrderedTierNames[decisionSplitLowIdx]
-        : decisionOrderedTierNames[decisionSplitHighIdx];
-    }
-  } else {
-    verdictTier = (decisionSplitLeftTotal > decisionSplitRightTotal)
-      ? decisionOrderedTierNames[decisionSplitLowIdx]
-      : decisionOrderedTierNames[decisionSplitHighIdx];
-  }
+  const splitVerdictTier = decisionTierSplit.winner.label;
+  const verdictTier = fuckRules.isFuckVerdict ? "Fuck" : splitVerdictTier;
 
   const verdictDiffersFromCurrent = verdictTier !== "" && verdictTier !== decisionCurrentTier;
-  let splitThreshold = 3;
-  if (allWeight >= 50 && allWeight < 100) splitThreshold = 4;
-  else if (allWeight >= 100) splitThreshold = 5;
-
-  const splitMargin = Math.abs(decisionSplitLeftTotal - decisionSplitRightTotal);
-  const splitMarginPct = totalWeight > 0 ? (splitMargin / totalWeight) : 0;
-  const passesSplitMajority = splitMargin >= splitThreshold;
-  const passesSplitPct = isPending ? (splitMarginPct >= 0.20) : (splitMarginPct >= 0.05);
-  const verdictIdx = (decisionSplitLeftTotal > decisionSplitRightTotal) ? decisionSplitLowIdx : decisionSplitHighIdx;
+  const passesSplitMajority = decisionTierSplit.passesWeightThreshold;
+  const passesSplitPct = decisionTierSplit.passesPctThreshold;
+  const verdictIdx = decisionTierSplit.winner.index;
   const verdictBaseName = decisionOrderedTierNames[verdictIdx];
-  const decisionWinningSideTotal = verdictIdx === decisionSplitLowIdx
-    ? decisionSplitLeftTotal
-    : decisionSplitRightTotal;
-  const decisionLosingSideTotal = verdictIdx === decisionSplitLowIdx
-    ? decisionSplitRightTotal
-    : decisionSplitLeftTotal;
   const requiresFuckPlacementMargin = fuckPresent && verdictTier !== "Fuck";
-  const fuckPlacementMargin = decisionWinningSideTotal - fuckWeight;
-  const passesFuckPlacementMargin = !requiresFuckPlacementMargin || fuckPlacementMargin >= splitThreshold;
-  const showsFuckPlacementSplit = requiresFuckPlacementMargin && fuckWeight > decisionLosingSideTotal;
-
-  let displaySplitLowTier = splitLowTier;
-  let displaySplitHighTier = splitHighTier;
-  let displaySplitLeftTotal = splitLeftTotal;
-  let displaySplitRightTotal = splitRightTotal;
-
-  if (showsFuckPlacementSplit) {
-    if (verdictIdx === decisionSplitLowIdx) {
-      displaySplitLowTier = verdictBaseName;
-      displaySplitHighTier = "Fuck";
-      displaySplitLeftTotal = decisionWinningSideTotal;
-      displaySplitRightTotal = fuckWeight;
-    } else {
-      displaySplitLowTier = "Fuck";
-      displaySplitHighTier = verdictBaseName;
-      displaySplitLeftTotal = fuckWeight;
-      displaySplitRightTotal = decisionWinningSideTotal;
-    }
-  }
+  const fuckPlacementComparison = requiresFuckPlacementMargin
+    ? buildFuckPlacementComparison_(decisionTierSplit, verdictBaseName, fuckWeight, totalWeight, splitThreshold)
+    : null;
+  const passesFuckPlacementMargin = !fuckPlacementComparison || fuckPlacementComparison.passesWeightThreshold;
+  const placementGate = selectPlacementComparison_(decisionTierSplit, fuckPlacementComparison, "");
 
   let canMove = false;
   if (fuckPresent) {
-    const fuckShare = (allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0);
     if (
       hasMinimumTotalOpinions &&
       (
-        (((fuckShare >= 0.2 && toppct < 0.35) || fuckpct >= 0.5) && verdictDiffersFromCurrent) ||
-        (passesSplitMajority && passesSplitPct && verdictDiffersFromCurrent)
+        (fuckRules.hasShareBasedMovementSignal && verdictDiffersFromCurrent) ||
+        (placementGate.passesWeightThreshold && placementGate.passesPctThreshold && verdictDiffersFromCurrent)
       )
     ) {
       canMove = true;
     }
   } else if (
     hasMinimumTotalOpinions &&
-    passesSplitMajority &&
-    passesSplitPct &&
+    placementGate.passesWeightThreshold &&
+    placementGate.passesPctThreshold &&
     verdictDiffersFromCurrent
   ) {
     canMove = true;
   }
 
-  if (canMove && !passesFuckPlacementMargin) {
-    canMove = false;
-  }
-
   let verdictTierName = verdictTier;
   if (fuckPresent) {
-    if (((fuckpct >= 0.2) && toppct < 0.35) || (sd >= 2 && passesMajority) || fuckpct >= 0.5) {
+    if (fuckRules.isFuckVerdict) {
       verdictTierName = "Fuck";
     } else if (currentTier !== "Fuck") {
       let arrow = "";
@@ -342,18 +298,34 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     decisionWeightsByTier,
     decisionOrderedTierNames,
     decisionCurrentIdx,
-    decisionSplitLowIdx,
-    decisionSplitHighIdx,
-    decisionSplitLeftTotal,
-    decisionSplitRightTotal
+    decisionTierSplit.lowIndex,
+    decisionTierSplit.highIndex,
+    decisionTierSplit.left.weight,
+    decisionTierSplit.right.weight
   );
-  const bookAlert = buildBookAlertFromPlacementSplit_(difference, decisionCurrentIdx, decisionSplitLowIdx);
-  const lockSideLabel = decisionSplitLeftTotal >= decisionSplitRightTotal
-    ? decisionOrderedTierNames[decisionSplitLowIdx]
-    : decisionOrderedTierNames[decisionSplitHighIdx];
+  const bookAlert = buildBookAlertFromPlacementSplit_(difference, decisionCurrentIdx, decisionTierSplit.lowIndex);
+  const lockSideLabel = decisionTierSplit.left.weight >= decisionTierSplit.right.weight
+    ? decisionTierSplit.left.label
+    : decisionTierSplit.right.label;
   const moveDirection = (verdictTier !== "Fuck" && decisionCurrentIdx >= 0)
     ? movementDirection_(decisionCurrentIdx, verdictIdx)
     : "";
+  const moveFailureReason = determinePlaceMoveFailureReason_({
+    totalWeightedOpinions: allWeight,
+    fuckRules,
+    isPending,
+    passesMajority,
+    passesSplitMajority,
+    verdictDiffersFromCurrent,
+    passesFuckPlacementMargin,
+    passesSplitPct,
+    isLockWorthy
+  });
+  const placementComparison = selectPlacementComparison_(
+    decisionTierSplit,
+    fuckPlacementComparison,
+    moveFailureReason
+  );
 
   return {
     tierName,
@@ -387,41 +359,26 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     decisionSecondTier,
     decisionSecondWeight,
     minimumOpinionWeight: decisionTopWeight,
-    splitLowIdx,
-    splitHighIdx,
-    splitLowTier,
-    splitHighTier,
-    splitLeftTotal,
-    splitRightTotal,
-    displaySplitLowTier,
-    displaySplitHighTier,
-    displaySplitLeftTotal,
-    displaySplitRightTotal,
+    tierSplit,
+    decisionTierSplit,
+    fuckPlacementComparison,
+    placementComparison,
     currentTier,
     currentIdx,
     isPending,
     decisionCurrentTier,
     decisionCurrentIdx,
-    decisionSplitLowIdx,
-    decisionSplitHighIdx,
-    decisionSplitLeftTotal,
-    decisionSplitRightTotal,
     toppct,
     fuckpct,
+    fuckRules,
     passesMajority,
     verdictTier,
     verdictDiffersFromCurrent,
     splitThreshold,
-    splitMargin,
-    splitMarginPct,
     passesSplitMajority,
     passesSplitPct,
-    decisionWinningSideTotal,
-    decisionLosingSideTotal,
     requiresFuckPlacementMargin,
-    fuckPlacementMargin,
     passesFuckPlacementMargin,
-    showsFuckPlacementSplit,
     verdictIdx,
     verdictBaseName,
     verdictTierName,
@@ -431,8 +388,146 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     lockSideLabel,
     difference,
     bookAlert,
-    moveDirection
+    moveDirection,
+    moveFailureReason
   };
+}
+
+function buildTierSplit_(orderedNames, weightsByTier, lowIndex, totalWeight, requiredMargin, requiredMarginPct) {
+  const highIndex = lowIndex + 1;
+  let leftWeight = 0;
+  let rightWeight = 0;
+
+  for (let i = 0; i <= lowIndex; i++) leftWeight += (weightsByTier[orderedNames[i]] || 0);
+  for (let i = highIndex; i < orderedNames.length; i++) rightWeight += (weightsByTier[orderedNames[i]] || 0);
+
+  const left = { label: orderedNames[lowIndex], weight: leftWeight, index: lowIndex };
+  const right = { label: orderedNames[highIndex], weight: rightWeight, index: highIndex };
+  const winnerSide = leftWeight > rightWeight ? "left" : "right";
+  const winner = winnerSide === "left" ? left : right;
+  const loser = winnerSide === "left" ? right : left;
+  const marginWeight = Math.abs(leftWeight - rightWeight);
+  const marginPct = totalWeight > 0 ? marginWeight / totalWeight : 0;
+
+  return {
+    kind: "tier-vs-tier",
+    lowIndex,
+    highIndex,
+    left,
+    right,
+    winnerSide,
+    winner,
+    loser,
+    marginWeight,
+    decisionMarginWeight: marginWeight,
+    marginPct,
+    requiredMargin,
+    requiredMarginPct,
+    passesWeightThreshold: marginWeight >= requiredMargin,
+    passesPctThreshold: marginPct >= requiredMarginPct
+  };
+}
+
+function buildFuckPlacementComparison_(tierSplit, verdictBaseName, fuckWeight, totalWeight, requiredMargin) {
+  const tierSide = {
+    label: verdictBaseName,
+    weight: tierSplit.winner.weight,
+    index: tierSplit.winner.index
+  };
+  const fuckSide = { label: "Fuck", weight: fuckWeight, index: -1 };
+  const tierIsLeft = tierSplit.winnerSide === "left";
+  const left = tierIsLeft ? tierSide : fuckSide;
+  const right = tierIsLeft ? fuckSide : tierSide;
+  const winnerSide = left.weight > right.weight ? "left" : "right";
+  const winner = winnerSide === "left" ? left : right;
+  const loser = winnerSide === "left" ? right : left;
+  const decisionMarginWeight = tierSide.weight - fuckSide.weight;
+  const marginWeight = Math.abs(decisionMarginWeight);
+
+  return {
+    kind: "tier-vs-fuck",
+    left,
+    right,
+    winnerSide,
+    winner,
+    loser,
+    decisionSide: tierIsLeft ? "left" : "right",
+    decisionLabel: verdictBaseName,
+    marginWeight,
+    decisionMarginWeight,
+    marginPct: totalWeight > 0 ? marginWeight / totalWeight : 0,
+    requiredMargin,
+    requiredMarginPct: 0,
+    passesWeightThreshold: decisionMarginWeight >= requiredMargin,
+    passesPctThreshold: true
+  };
+}
+
+function selectPlacementComparison_(tierSplit, fuckComparison, moveFailureReason) {
+  let active = tierSplit;
+
+  if (
+    fuckComparison &&
+    moveFailureReason !== "low_split_margin" &&
+    fuckComparison.decisionMarginWeight < tierSplit.decisionMarginWeight
+  ) {
+    active = fuckComparison;
+  }
+
+  return {
+    ...active,
+    tierSplit,
+    fuckComparison,
+    passesWeightThreshold: tierSplit.passesWeightThreshold &&
+      (!fuckComparison || fuckComparison.passesWeightThreshold),
+    passesPctThreshold: tierSplit.passesPctThreshold
+  };
+}
+
+function evaluateFuckRules_(fuckPresent, fuckpct, toppct, sd, passesMajority) {
+  const meetsShareThreshold = fuckpct >= 0.25;
+  const hasLowTopShare = toppct < 0.35;
+  const hasMajorityFuckShare = fuckpct >= 0.5;
+  const hasHighVolatility = sd >= 2;
+  const hasLowTopShareSignal = meetsShareThreshold && hasLowTopShare;
+  const hasVolatilityVerdictSignal = hasHighVolatility && passesMajority;
+
+  return {
+    meetsShareThreshold,
+    hasLowTopShare,
+    hasMajorityFuckShare,
+    hasHighVolatility,
+    hasShareBasedMovementSignal: hasLowTopShareSignal || hasMajorityFuckShare,
+    isFuckVerdict: !!fuckPresent && (
+      hasLowTopShareSignal ||
+      hasMajorityFuckShare ||
+      hasVolatilityVerdictSignal
+    ),
+    isFuckMode: !!fuckPresent &&
+      (hasMajorityFuckShare || hasLowTopShare) &&
+      (meetsShareThreshold || hasHighVolatility)
+  };
+}
+
+function determinePlaceMoveFailureReason_(ctx) {
+  if (ctx.totalWeightedOpinions < 4) return "needs_more_opinions";
+
+  if (ctx.fuckRules.isFuckMode) {
+    if (ctx.isPending && !ctx.passesMajority) return "needs_more_opinions";
+    if (!ctx.verdictDiffersFromCurrent || ctx.fuckRules.hasMajorityFuckShare) return "no_movement_f";
+    if (!ctx.passesSplitMajority && ctx.fuckRules.hasHighVolatility) return "split_not_decisive_f";
+    return "fuck_rules_not_met";
+  }
+
+  if (ctx.isPending && !ctx.passesSplitMajority) return "split_not_decisive";
+  if (ctx.isPending && !ctx.passesMajority) return "needs_more_opinions";
+  if (!ctx.passesSplitMajority) return "split_not_decisive";
+  if (!ctx.passesMajority) return "needs_more_opinions";
+  if (!ctx.passesFuckPlacementMargin) return "fuck_placement_not_decisive";
+  if (!ctx.passesSplitPct && ctx.verdictDiffersFromCurrent) return "low_split_margin";
+  if (ctx.isLockWorthy) return "lock_threshold_met";
+  if (!ctx.verdictDiffersFromCurrent) return "no_movement";
+  return "rules_not_met";
 }
 
 function buildSplitDifference_(

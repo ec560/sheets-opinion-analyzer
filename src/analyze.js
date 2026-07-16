@@ -45,10 +45,7 @@ function analyzeSelectedLevel() {
     topWeight,
     secondTier,
     secondWeight,
-    displaySplitLowTier,
-    displaySplitHighTier,
-    displaySplitLeftTotal,
-    displaySplitRightTotal,
+    placementComparison,
     toppct,
     fuckpct,
     passesMajority,
@@ -62,12 +59,9 @@ function analyzeSelectedLevel() {
     minimumOpinionWeight,
     lockSharePct,
     passesSplitPct,
-    splitMarginPct,
-    splitMargin,
     splitThreshold,
-    fuckPlacementMargin,
-    passesFuckPlacementMargin,
-    currentTier
+    currentTier,
+    moveFailureReason
   } = analysis;
 
   const out = [];
@@ -94,9 +88,9 @@ function analyzeSelectedLevel() {
 
   out.push([
     `Split`,
-    `${displaySplitLowTier}`,
-    `${displaySplitHighTier}`,
-    `${upTo3dec_(displaySplitLeftTotal)} | ${upTo3dec_(displaySplitRightTotal)}`
+    `${placementComparison.left.label}`,
+    `${placementComparison.right.label}`,
+    `${upTo3dec_(placementComparison.left.weight)} | ${upTo3dec_(placementComparison.right.weight)}`
   ]);
 
   out.push(["", "", "", ""]);
@@ -139,8 +133,7 @@ function analyzeSelectedLevel() {
     topTier,
     topWeight,
     secondTier,
-    displaySplitLowTier,
-    displaySplitHighTier,
+    placementComparison,
     passesMajority,
     passesSplitMajority,
     verdictDiffersFromCurrent,
@@ -160,11 +153,8 @@ function analyzeSelectedLevel() {
     lockSharePct,
     allWeight,
     passesSplitPct,
-    splitMarginPct,
-    splitMargin,
     splitThreshold,
-    passesFuckPlacementMargin,
-    fuckPlacementMargin
+    moveFailureReason
   );
 
   applyCountedPlayerHighlights_(tool, DATA_START_ROW, bgs, countedRowFlags);
