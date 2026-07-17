@@ -55,20 +55,11 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
       }
 
       const fontTier = difficultyColorNames[fontKey];
-      if (fontTier && fontTier !== "Insane") {
+      if (fontTier) {
         const it = tierIdxOf(fontTier);
         if (it >= 0) rawPoints.push(it);
         countedRowFlags[r] = true;
         addTierWeight(fontTier, w);
-        totalWeight += w;
-        continue;
-      }
-
-      if (String(opinionText).toLowerCase().includes("insane")) {
-        const it = tierIdxOf("Insane");
-        if (it >= 0) rawPoints.push(it);
-        countedRowFlags[r] = true;
-        addTierWeight("Insane", w);
         totalWeight += w;
         continue;
       }
@@ -116,9 +107,9 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
   const rawMeanLabel = tierLabelFromIndex_(orderedTierNames, rawMeanIdx);
   const rawMedianLabel = tierLabelFromIndex_(orderedTierNames, rawMedianIdx);
 
-  const entries = Object.entries(weightsByTier).sort((a, b) => b[1] - a[1]);
-  const top = entries[0] || ["(none)", 0];
-  const second = entries[1] || ["(none)", 0];
+  const tierRanking = rankTierWeights_(orderedTierNames, weightsByTier);
+  const top = tierRanking.top;
+  const second = tierRanking.second;
   const topTier = top[0];
   const topWeight = top[1];
   const secondTier = second[0];
@@ -157,25 +148,17 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
   const currentTier = String(tierName || "").trim();
   const currentIdx = orderedTierNames.indexOf(currentTier);
   const isPending = currentTier.toLowerCase() === "pending";
-  const topIdx = orderedTierNames.indexOf(topTier);
-  const runnerIdx = orderedTierNames.indexOf(secondTier);
-  const splitLowIdx = pickSplitLowIdx_(
-    orderedTierNames,
-    weightsByTier,
-    topIdx,
-    runnerIdx,
-    currentIdx,
-    rawMedianIdx,
-    isPending
-  );
   let splitThreshold = 3;
   if (allWeight >= 50 && allWeight < 100) splitThreshold = 4;
   else if (allWeight >= 100) splitThreshold = 5;
   const requiredSplitPct = 0.05;
-  const tierSplit = buildTierSplit_(
+  const tierSplit = calculateSplit_(
     orderedTierNames,
     weightsByTier,
-    splitLowIdx,
+    tierRanking,
+    currentIdx,
+    rawMedianIdx,
+    isPending,
     totalWeight,
     splitThreshold,
     requiredSplitPct
@@ -194,32 +177,24 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     }
   }
 
-  const decisionEntries = Object.entries(decisionWeightsByTier).sort((a, b) => b[1] - a[1]);
-  const decisionTop = decisionEntries[0] || ["(none)", 0];
-  const decisionSecond = decisionEntries[1] || ["(none)", 0];
+  const decisionRanking = rankTierWeights_(decisionOrderedTierNames, decisionWeightsByTier);
+  const decisionTop = decisionRanking.top;
+  const decisionSecond = decisionRanking.second;
   const decisionTopTier = decisionTop[0];
   const decisionTopWeight = decisionTop[1];
   const decisionSecondTier = decisionSecond[0];
   const decisionSecondWeight = decisionSecond[1];
-  const decisionTopIdx = decisionOrderedTierNames.indexOf(decisionTopTier);
-  const decisionRunnerIdx = decisionOrderedTierNames.indexOf(decisionSecondTier);
   const decisionCurrentTier = isPending ? currentTier : decisionTierName(currentTier);
   const decisionCurrentIdx = decisionOrderedTierNames.indexOf(decisionCurrentTier);
   const decisionCenterTier = decisionTierName(rawMedianLabel);
   const decisionCenterIdx = decisionOrderedTierNames.indexOf(decisionCenterTier);
-  const decisionSplitLowIdx = pickSplitLowIdx_(
+  const decisionTierSplit = calculateSplit_(
     decisionOrderedTierNames,
     decisionWeightsByTier,
-    decisionTopIdx,
-    decisionRunnerIdx,
+    decisionRanking,
     decisionCurrentIdx,
     decisionCenterIdx,
-    isPending
-  );
-  const decisionTierSplit = buildTierSplit_(
-    decisionOrderedTierNames,
-    decisionWeightsByTier,
-    decisionSplitLowIdx,
+    isPending,
     totalWeight,
     splitThreshold,
     requiredSplitPct
@@ -390,97 +365,6 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     bookAlert,
     moveDirection,
     moveFailureReason
-  };
-}
-
-function buildTierSplit_(orderedNames, weightsByTier, lowIndex, totalWeight, requiredMargin, requiredMarginPct) {
-  const highIndex = lowIndex + 1;
-  let leftWeight = 0;
-  let rightWeight = 0;
-
-  for (let i = 0; i <= lowIndex; i++) leftWeight += (weightsByTier[orderedNames[i]] || 0);
-  for (let i = highIndex; i < orderedNames.length; i++) rightWeight += (weightsByTier[orderedNames[i]] || 0);
-
-  const left = { label: orderedNames[lowIndex], weight: leftWeight, index: lowIndex };
-  const right = { label: orderedNames[highIndex], weight: rightWeight, index: highIndex };
-  const winnerSide = leftWeight > rightWeight ? "left" : "right";
-  const winner = winnerSide === "left" ? left : right;
-  const loser = winnerSide === "left" ? right : left;
-  const marginWeight = Math.abs(leftWeight - rightWeight);
-  const marginPct = totalWeight > 0 ? marginWeight / totalWeight : 0;
-
-  return {
-    kind: "tier-vs-tier",
-    lowIndex,
-    highIndex,
-    left,
-    right,
-    winnerSide,
-    winner,
-    loser,
-    marginWeight,
-    decisionMarginWeight: marginWeight,
-    marginPct,
-    requiredMargin,
-    requiredMarginPct,
-    passesWeightThreshold: marginWeight >= requiredMargin,
-    passesPctThreshold: marginPct >= requiredMarginPct
-  };
-}
-
-function buildFuckPlacementComparison_(tierSplit, verdictBaseName, fuckWeight, totalWeight, requiredMargin) {
-  const tierSide = {
-    label: verdictBaseName,
-    weight: tierSplit.winner.weight,
-    index: tierSplit.winner.index
-  };
-  const fuckSide = { label: "Fuck", weight: fuckWeight, index: -1 };
-  const tierIsLeft = tierSplit.winnerSide === "left";
-  const left = tierIsLeft ? tierSide : fuckSide;
-  const right = tierIsLeft ? fuckSide : tierSide;
-  const winnerSide = left.weight > right.weight ? "left" : "right";
-  const winner = winnerSide === "left" ? left : right;
-  const loser = winnerSide === "left" ? right : left;
-  const decisionMarginWeight = tierSide.weight - fuckSide.weight;
-  const marginWeight = Math.abs(decisionMarginWeight);
-
-  return {
-    kind: "tier-vs-fuck",
-    left,
-    right,
-    winnerSide,
-    winner,
-    loser,
-    decisionSide: tierIsLeft ? "left" : "right",
-    decisionLabel: verdictBaseName,
-    marginWeight,
-    decisionMarginWeight,
-    marginPct: totalWeight > 0 ? marginWeight / totalWeight : 0,
-    requiredMargin,
-    requiredMarginPct: 0,
-    passesWeightThreshold: decisionMarginWeight >= requiredMargin,
-    passesPctThreshold: true
-  };
-}
-
-function selectPlacementComparison_(tierSplit, fuckComparison, moveFailureReason) {
-  let active = tierSplit;
-
-  if (
-    fuckComparison &&
-    moveFailureReason !== "low_split_margin" &&
-    fuckComparison.decisionMarginWeight < tierSplit.decisionMarginWeight
-  ) {
-    active = fuckComparison;
-  }
-
-  return {
-    ...active,
-    tierSplit,
-    fuckComparison,
-    passesWeightThreshold: tierSplit.passesWeightThreshold &&
-      (!fuckComparison || fuckComparison.passesWeightThreshold),
-    passesPctThreshold: tierSplit.passesPctThreshold
   };
 }
 
