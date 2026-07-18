@@ -4,6 +4,7 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
 
   let fuckPresent = false;
   let fuckWeight = 0;
+  let fuckOpinionCount = 0;
   let totalWeight = 0;
   let rawCount = 0;
   const rawPoints = [];
@@ -32,6 +33,7 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     if (opinionColor === "#000000") {
       fuckPresent = true;
       rawCount++;
+      fuckOpinionCount++;
       fuckWeight += w;
       countedRowFlags[r] = true;
 
@@ -209,7 +211,13 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
   const fuckpct = allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0;
   const hasMinimumTotalOpinions = allWeight >= FLAG_LOW_OPINION_WEIGHT;
   const passesMajority = hasMinimumTotalOpinions;
-  const fuckRules = evaluateFuckRules_(fuckPresent, fuckpct, toppct, sd, passesMajority);
+  const fuckRules = evaluateFuckRules_(
+    fuckPresent,
+    fuckOpinionCount,
+    fuckpct,
+    sd,
+    passesMajority
+  );
 
   const splitVerdictTier = decisionTierSplit.winner.label;
   const verdictTier = fuckRules.isFuckVerdict ? "Fuck" : splitVerdictTier;
@@ -231,7 +239,7 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     if (
       hasMinimumTotalOpinions &&
       (
-        (fuckRules.hasShareBasedMovementSignal && verdictDiffersFromCurrent) ||
+        (fuckRules.hasMajorityFuckSignal && verdictDiffersFromCurrent) ||
         (placementGate.passesWeightThreshold && placementGate.passesPctThreshold && verdictDiffersFromCurrent)
       )
     ) {
@@ -319,6 +327,7 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     sd,
     fuckPresent,
     fuckWeight,
+    fuckOpinionCount,
     totalWeight,
     tierWeightSum,
     allWeight,
@@ -368,28 +377,23 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
   };
 }
 
-function evaluateFuckRules_(fuckPresent, fuckpct, toppct, sd, passesMajority) {
-  const meetsShareThreshold = fuckpct >= 0.25;
-  const hasLowTopShare = toppct < 0.35;
+function evaluateFuckRules_(fuckPresent, fuckOpinionCount, fuckpct, sd, passesMajority) {
+  const hasMinimumFuckOpinions = fuckOpinionCount >= FUCK_MIN_OPINION_COUNT;
   const hasMajorityFuckShare = fuckpct >= 0.5;
   const hasHighVolatility = sd >= 2;
-  const hasLowTopShareSignal = meetsShareThreshold && hasLowTopShare;
-  const hasVolatilityVerdictSignal = hasHighVolatility && passesMajority;
+  const hasVolatilitySignal = hasHighVolatility && passesMajority;
+  const qualifiesForFuck = hasMinimumFuckOpinions &&
+    (hasMajorityFuckShare || hasVolatilitySignal);
 
   return {
-    meetsShareThreshold,
-    hasLowTopShare,
+    hasMinimumFuckOpinions,
     hasMajorityFuckShare,
     hasHighVolatility,
-    hasShareBasedMovementSignal: hasLowTopShareSignal || hasMajorityFuckShare,
-    isFuckVerdict: !!fuckPresent && (
-      hasLowTopShareSignal ||
-      hasMajorityFuckShare ||
-      hasVolatilityVerdictSignal
-    ),
-    isFuckMode: !!fuckPresent &&
-      (hasMajorityFuckShare || hasLowTopShare) &&
-      (meetsShareThreshold || hasHighVolatility)
+    hasVolatilitySignal,
+    hasMajorityFuckSignal: hasMinimumFuckOpinions && hasMajorityFuckShare,
+    qualifiesForFuck,
+    isFuckVerdict: !!fuckPresent && qualifiesForFuck,
+    isFuckMode: !!fuckPresent && qualifiesForFuck
   };
 }
 
