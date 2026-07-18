@@ -397,8 +397,7 @@ function evaluateFuckRules_(fuckPresent, fuckOpinionCount, fuckpct, sd, passesMa
   const hasMajorityFuckShare = fuckpct >= 0.5;
   const hasHighVolatility = sd >= 2;
   const hasVolatilitySignal = hasHighVolatility && passesMajority;
-  const qualifiesForFuck = hasMinimumFuckOpinions &&
-    (hasMajorityFuckShare || hasVolatilitySignal);
+  const qualifiesForFuck = ((hasMajorityFuckShare && hasMinimumFuckOpinions) || hasVolatilitySignal);
 
   return {
     hasMinimumFuckOpinions,
