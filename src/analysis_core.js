@@ -38,26 +38,34 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
       countedRowFlags[r] = true;
 
       const fontKey = hex_(opinionFont);
+      const countsAsInsane = isRedFuckInsaneOpinion_(opinionText, fontKey);
       if (splitPairs[fontKey]) {
         const [lowHex, highHex] = splitPairs[fontKey].map(hex_);
         const lowTier = difficultyColorNames[lowHex];
         const highTier = difficultyColorNames[highHex];
-        const i1 = tierIdxOf(lowTier);
-        const i2 = tierIdxOf(highTier);
+        const tierContributions = [lowTier, highTier].filter(tier => {
+          return tier && (tier !== "Insane" || countsAsInsane);
+        });
+        const contributionIndexes = tierContributions
+          .map(tierIdxOf)
+          .filter(index => index >= 0);
 
-        if (i1 >= 0 && i2 >= 0) rawPoints.push((i1 + i2) / 2);
+        if (contributionIndexes.length === 2) {
+          rawPoints.push((contributionIndexes[0] + contributionIndexes[1]) / 2);
+        } else if (contributionIndexes.length === 1) {
+          rawPoints.push(contributionIndexes[0]);
+        }
         if (lowTier && highTier) {
           countedRowFlags[r] = true;
           const halfW = w / 2;
-          addTierWeight(lowTier, halfW);
-          addTierWeight(highTier, halfW);
+          for (const tier of tierContributions) addTierWeight(tier, halfW);
           totalWeight += w;
         }
         continue;
       }
 
       const fontTier = difficultyColorNames[fontKey];
-      if (fontTier) {
+      if (fontTier && (fontTier !== "Insane" || countsAsInsane)) {
         const it = tierIdxOf(fontTier);
         if (it >= 0) rawPoints.push(it);
         countedRowFlags[r] = true;
@@ -375,6 +383,13 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     moveDirection,
     moveFailureReason
   };
+}
+
+function isRedFuckInsaneOpinion_(opinionText, fontColor) {
+  if (hex_(fontColor) !== "#ff0000") return false;
+
+  const normalizedText = String(opinionText || "").toLowerCase();
+  return /\bfuck\b/.test(normalizedText) && /\binsane\b/.test(normalizedText);
 }
 
 function evaluateFuckRules_(fuckPresent, fuckOpinionCount, fuckpct, sd, passesMajority) {
