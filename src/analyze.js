@@ -63,6 +63,7 @@ function analyzeSelectedLevel() {
     currentTier,
     moveFailureReason
   } = analysis;
+  const reliabilityDistribution = buildReliabilityDistribution_(bgs, countedRowFlags);
 
   const out = [];
   out.push([`Tier sheet`, tierName, "", ""]);
@@ -100,11 +101,22 @@ function analyzeSelectedLevel() {
     out.push(["", "", "", ""]);
   }
   out.push(["Tier", "Weighted", "%", ""]);
-  for (const t of orderedTierNames) {
+  const distributionTierNames = getVisibleDistributionNames_(orderedTierNames, weightsByTier);
+  for (const t of distributionTierNames) {
     const w = weightsByTier[t] || 0;
     const denom = tierWeightSum > 0 ? tierWeightSum : 1;
     const share = w / denom;
     out.push([t, w, share, ""]);
+  }
+
+  if (reliabilityDistribution.names.length > 0) {
+    out.push(["", "", "", ""]);
+    out.push(["Reliability", "Weighted", "%", ""]);
+    for (const name of reliabilityDistribution.names) {
+      const weight = reliabilityDistribution.weights[name] || 0;
+      const denominator = reliabilityDistribution.totalWeight || 1;
+      out.push([name, weight, weight / denominator, ""]);
+    }
   }
 
   const startRow = 1;
@@ -128,7 +140,7 @@ function analyzeSelectedLevel() {
   formatAnalysisOutput_(
     tool,
     out.length,
-    orderedTierNames,
+    distributionTierNames,
     weightsByTier,
     topTier,
     topWeight,
@@ -154,8 +166,55 @@ function analyzeSelectedLevel() {
     allWeight,
     passesSplitPct,
     splitThreshold,
-    moveFailureReason
+    moveFailureReason,
+    reliabilityDistribution
   );
 
   applyCountedPlayerHighlights_(tool, DATA_START_ROW, bgs, countedRowFlags);
+}
+
+function getVisibleDistributionNames_(orderedNames, weightsByName) {
+  let firstPositiveIdx = -1;
+  let lastPositiveIdx = -1;
+
+  for (let i = 0; i < orderedNames.length; i++) {
+    if ((weightsByName[orderedNames[i]] || 0) <= 0) continue;
+    if (firstPositiveIdx < 0) firstPositiveIdx = i;
+    lastPositiveIdx = i;
+  }
+
+  if (firstPositiveIdx < 0) return [];
+  return orderedNames.slice(firstPositiveIdx, lastPositiveIdx + 1);
+}
+
+function buildReliabilityDistribution_(backgrounds, countedRowFlags) {
+  const positiveLevels = reliabilityDistributionLevels.filter(level => {
+    return (reliabilityFactors[hex_(level.color)] || 0) > 0;
+  });
+  const orderedNames = positiveLevels.map(level => level.name);
+  const weights = {};
+  const nameByColor = {};
+
+  for (const level of positiveLevels) {
+    weights[level.name] = 0;
+    nameByColor[hex_(level.color)] = level.name;
+  }
+
+  for (let row = 0; row < countedRowFlags.length; row++) {
+    if (!countedRowFlags[row]) continue;
+
+    const reliabilityColor = hex_(backgrounds[row] && backgrounds[row][2]);
+    const reliabilityName = nameByColor[reliabilityColor];
+    const reliabilityWeight = reliabilityFactors[reliabilityColor] || 0;
+    if (!reliabilityName || reliabilityWeight <= 0) continue;
+
+    weights[reliabilityName] += reliabilityWeight;
+  }
+
+  const totalWeight = orderedNames.reduce((sum, name) => sum + weights[name], 0);
+  return {
+    names: orderedNames,
+    weights,
+    totalWeight
+  };
 }

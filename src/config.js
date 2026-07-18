@@ -2,7 +2,7 @@
 
 const ANALYSIS_SHEET_NAME = "Tier Analysis";
 const FLAG_SCAN_SHEET_NAME = "Tier Flags";
-const VERSION = "v1.4.4";
+const VERSION = "v1.5.0";
 const TIER_CELL = "B1";
 const LEVEL_CELL = "B2";
 const DATA_START_ROW = 4;                      // where A:C gets populated
@@ -36,6 +36,15 @@ const reliabilityFactors = {
   "#ff00ff": 0,
   "#000000": 0
 };
+
+// positive reliability levels shown in the output distribution from high to low
+// zero reliability colors excluded from analysis and display
+const reliabilityDistributionLevels = [
+  { name: "Extremely", color: "#00ffff" },
+  { name: "Yes", color: "#00ff00" },
+  { name: "Somewhat", color: "#ffff00" },
+  { name: "Not Really", color: "#ff9900" }
+];
 
 // difficulty background color = tier name
 const difficultyColorNames = {

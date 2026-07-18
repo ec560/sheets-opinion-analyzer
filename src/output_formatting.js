@@ -90,7 +90,7 @@ function resolvePlaceMoveFailure_(ctx) {
 function formatAnalysisOutput_(
   tool,
   outRowCount,
-  orderedTierNames,
+  distributionTierNames,
   weightsByTier,
   topTier,
   topWeight,
@@ -116,7 +116,8 @@ function formatAnalysisOutput_(
   totalWeightedOpinions,
   passesSplitPct,
   splitThreshold,
-  moveFailureReason
+  moveFailureReason,
+  reliabilityDistribution
 ) {
   const r0 = OUTPUT_START_ROW;
   const c0 = OUTPUT_COL;
@@ -151,6 +152,7 @@ function formatAnalysisOutput_(
   const splitRow = labels.findIndex(v => v === "Split");
   const signalHeader = labels.findIndex(v => String(v).trim() === "Fuck % of all");
   const distHeader = labels.findIndex(v => String(v).trim() === "Tier");
+  const reliabilityHeader = labels.findIndex(v => String(v).trim() === "Reliability");
 
   // Header rows
   const tierRow = labels.findIndex(v => String(v).trim() === "Tier sheet");
@@ -344,15 +346,16 @@ function formatAnalysisOutput_(
   // Distribution table
   if (distHeader >= 0) {
     const headerRow = r0 + distHeader;
-    const firstData = headerRow + 1;
-    const lastDataRow = firstData + orderedTierNames.length - 1;
-
-    // Header row subtle
-    tool.getRange(headerRow, c0, 1, OUTPUT_WIDTH)
-      .setBackground("#eeeeee")
-      .setFontWeight("bold");
-
     const nameToColor = buildTierNameToColor_();
+    const firstData = formatWeightedDistribution_(
+      tool,
+      headerRow,
+      c0,
+      distributionTierNames,
+      weightsByTier,
+      nameToColor,
+      totalWeightedOpinions
+    );
 
     if (idxFuckSignal >= 0) {
       const fuckRow = r0 + idxFuckSignal;
@@ -388,51 +391,9 @@ function formatAnalysisOutput_(
       );
     }
 
-    for (let i = 0; i < orderedTierNames.length; i++) {
-      const row = firstData + i;
-      const tier = orderedTierNames[i];
-      const w = weightsByTier[tier] || 0;
-
-      if (w === 0) {
-        tool.getRange(row, c0, 1, OUTPUT_WIDTH)
-          .setFontColor("#9e9e9e");
-        continue;
-      }
-
-      if (nameToColor[tier]) {
-        tool.getRange(row, c0)
-          .setBackground(nameToColor[tier])
-          .setFontWeight("bold")
-          .setFontColor(tierTextColor_(tier));
-      }
-
-      const sparkCol = c0 + 3; // H
-      const sparkCell = tool.getRange(row, sparkCol);
-      const color1 = nameToColor[tier] || "#999999";
-      const fullWidthAt = 45;
-      const minScale = 0.2;
-      const confidenceScale = Math.min(
-        minScale + (1 - minScale) * (totalWeightedOpinions / fullWidthAt),
-        1
-      );
-
-      sparkCell.setFormulaR1C1(
-        `=SPARKLINE({(RC[-1]/MAX(R${firstData}C[-1]:R${lastDataRow}C[-1]))*${confidenceScale},1},` +
-        `{"charttype","bar";"color1","${color1}";"color2","white";"max",1})`
-      );
-
-      // old sparkline
-      /*
-      sparkCell.setFormulaR1C1(
-        `=SPARKLINE({RC[-1]/MAX(R${firstData}C[-1]:R${lastDataRow}C[-1]),1},` +
-        `{"charttype","bar";"color1","${color1}";"color2","white";"max",1})`
-      );
-      */
-    }
-
     // Emphasize top + runner only
-    const tIdx = orderedTierNames.indexOf(topTier);
-    const rIdx = orderedTierNames.indexOf(runnerTier);
+    const tIdx = distributionTierNames.indexOf(topTier);
+    const rIdx = distributionTierNames.indexOf(runnerTier);
 
     if (tIdx >= 0) {
       tool.getRange(firstData + tIdx, c0, 1, OUTPUT_WIDTH)
@@ -445,6 +406,23 @@ function formatAnalysisOutput_(
     }
   }
 
+  if (reliabilityHeader >= 0 && reliabilityDistribution.names.length > 0) {
+    const reliabilityColors = {};
+    for (const level of reliabilityDistributionLevels) {
+      reliabilityColors[level.name] = level.color;
+    }
+
+    formatWeightedDistribution_(
+      tool,
+      r0 + reliabilityHeader,
+      c0,
+      reliabilityDistribution.names,
+      reliabilityDistribution.weights,
+      reliabilityColors,
+      reliabilityDistribution.totalWeight
+    );
+  }
+
   if (idxFuckSignal >= 0) {
     tool.getRange(r0 + idxFuckSignal, c0 + 1, 1, 1)
       .setHorizontalAlignment("right")
@@ -453,6 +431,55 @@ function formatAnalysisOutput_(
       .setNumberFormat("0.0%")
       .setHorizontalAlignment("right");
   }
+}
+
+function formatWeightedDistribution_(
+  tool,
+  headerRow,
+  startCol,
+  names,
+  weightsByName,
+  colorsByName,
+  totalWeightedOpinions
+) {
+  const firstDataRow = headerRow + 1;
+  const lastDataRow = firstDataRow + names.length - 1;
+
+  tool.getRange(headerRow, startCol, 1, OUTPUT_WIDTH)
+    .setBackground("#eeeeee")
+    .setFontWeight("bold");
+
+  for (let i = 0; i < names.length; i++) {
+    const row = firstDataRow + i;
+    const name = names[i];
+    const weight = weightsByName[name] || 0;
+
+    if (weight === 0) {
+      tool.getRange(row, startCol, 1, OUTPUT_WIDTH)
+        .setFontColor("#9e9e9e");
+      continue;
+    }
+
+    const color = colorsByName[name] || "#999999";
+    tool.getRange(row, startCol)
+      .setBackground(color)
+      .setFontWeight("bold")
+      .setFontColor(tierTextColor_(name));
+
+    const fullWidthAt = 45;
+    const minScale = 0.2;
+    const confidenceScale = Math.min(
+      minScale + (1 - minScale) * (totalWeightedOpinions / fullWidthAt),
+      1
+    );
+
+    tool.getRange(row, startCol + 3).setFormulaR1C1(
+      `=SPARKLINE({(RC[-1]/MAX(R${firstDataRow}C[-1]:R${lastDataRow}C[-1]))*${confidenceScale},1},` +
+      `{"charttype","bar";"color1","${color}";"color2","white";"max",1})`
+    );
+  }
+
+  return firstDataRow;
 }
 
 function setAnalysisStatusMessage_(tool, message, bg) {
