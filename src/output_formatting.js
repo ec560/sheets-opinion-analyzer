@@ -417,9 +417,9 @@ function formatAnalysisOutput_(
       r0 + reliabilityHeader,
       c0,
       reliabilityDistribution.names,
-      reliabilityDistribution.weights,
+      reliabilityDistribution.counts,
       reliabilityColors,
-      reliabilityDistribution.totalWeight
+      reliabilityDistribution.totalCount
     );
   }
 

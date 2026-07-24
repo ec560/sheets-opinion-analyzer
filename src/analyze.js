@@ -121,11 +121,11 @@ function analyzeSelectedLevel() {
 
   if (reliabilityDistribution.names.length > 0) {
     out.push(["", "", "", ""]);
-    out.push(["Reliability", "Weighted", "%", ""]);
+    out.push(["Reliability", "Count", "%", ""]);
     for (const name of reliabilityDistribution.names) {
-      const weight = reliabilityDistribution.weights[name] || 0;
-      const denominator = reliabilityDistribution.totalWeight || 1;
-      out.push([name, weight, weight / denominator, ""]);
+      const count = reliabilityDistribution.counts[name] || 0;
+      const denominator = reliabilityDistribution.totalCount || 1;
+      out.push([name, count, count / denominator, ""]);
     }
   }
 
@@ -202,11 +202,11 @@ function buildReliabilityDistribution_(backgrounds, countedRowFlags) {
     return (reliabilityFactors[hex_(level.color)] || 0) > 0;
   });
   const orderedNames = positiveLevels.map(level => level.name);
-  const weights = {};
+  const counts = {};
   const nameByColor = {};
 
   for (const level of positiveLevels) {
-    weights[level.name] = 0;
+    counts[level.name] = 0;
     nameByColor[hex_(level.color)] = level.name;
   }
 
@@ -215,16 +215,15 @@ function buildReliabilityDistribution_(backgrounds, countedRowFlags) {
 
     const reliabilityColor = hex_(backgrounds[row] && backgrounds[row][2]);
     const reliabilityName = nameByColor[reliabilityColor];
-    const reliabilityWeight = reliabilityFactors[reliabilityColor] || 0;
-    if (!reliabilityName || reliabilityWeight <= 0) continue;
+    if (!reliabilityName) continue;
 
-    weights[reliabilityName] += reliabilityWeight;
+    counts[reliabilityName] += 1;
   }
 
-  const totalWeight = orderedNames.reduce((sum, name) => sum + weights[name], 0);
+  const totalCount = orderedNames.reduce((sum, name) => sum + counts[name], 0);
   return {
     names: orderedNames,
-    weights,
-    totalWeight
+    counts,
+    totalCount
   };
 }
