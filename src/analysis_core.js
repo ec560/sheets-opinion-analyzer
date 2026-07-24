@@ -1,4 +1,10 @@
 function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
+  if (typeof loadTierConfiguration_ === "function") {
+    const configResult = loadTierConfiguration_();
+    if (!configResult.valid && !configResult.missing) {
+      throw new Error("Tier Configuration: " + configResult.errors.join(" "));
+    }
+  }
   const weightsByTier = {};
   for (const n of orderedTierNames) weightsByTier[n] = 0;
 
@@ -174,10 +180,11 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     requiredSplitPct
   );
 
-  const decisionTierName = (name) => {
-    return (name === "Beginner" || name === "Insane Demon") ? "Beginner" : name;
-  };
-  const decisionOrderedTierNames = orderedTierNames.filter(name => name !== "Insane Demon");
+  const decisionTierName = (name) => tierDecisionTargets[name] || name;
+  const decisionOrderedTierNames = orderedTierNames.filter((name, index, names) => {
+    const target = decisionTierName(name);
+    return target === name && names.indexOf(name) === index;
+  });
   const decisionWeightsByTier = {};
   for (const n of decisionOrderedTierNames) decisionWeightsByTier[n] = 0;
   for (const n of orderedTierNames) {
@@ -269,8 +276,8 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     } else if (currentTier !== "Fuck") {
       let arrow = "";
       if (decisionCurrentIdx >= 0) {
-        if (verdictIdx < currentIdx) arrow = "\u2193    ";
-        else if (verdictIdx > currentIdx) arrow = "\u2191    ";
+        if (verdictIdx < decisionCurrentIdx) arrow = "\u2193    ";
+         else if (verdictIdx > decisionCurrentIdx) arrow = "\u2191    ";
       }
       verdictTierName = arrow + verdictBaseName;
     }
@@ -279,8 +286,8 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
   } else {
     let arrow = "";
     if (decisionCurrentIdx >= 0) {
-      if (verdictIdx < currentIdx) arrow = "\u2193    ";
-      else if (verdictIdx > currentIdx) arrow = "\u2191    ";
+      if (verdictIdx < decisionCurrentIdx) arrow = "\u2193    ";
+      else if (verdictIdx > decisionCurrentIdx) arrow = "\u2191    ";
     }
     verdictTierName = arrow + verdictBaseName;
   }

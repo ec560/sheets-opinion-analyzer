@@ -1,6 +1,12 @@
 // setup
 function setupTierAnalysis() {
   const ss = SpreadsheetApp.getActive();
+  if (typeof setupTierConfiguration_ !== "function") {
+    SpreadsheetApp.getUi().alert("Tier configuration code is missing");
+    return;
+  }
+  setupTierConfiguration_();
+  loadTierConfiguration_();
   let sh = ss.getSheetByName(ANALYSIS_SHEET_NAME);
   if (!sh) sh = ss.insertSheet(ANALYSIS_SHEET_NAME);
 

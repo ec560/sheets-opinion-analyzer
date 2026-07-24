@@ -20,9 +20,14 @@ function hex_(color) {
 }
 
 function tierTextColor_(tierName) {
-  if (tierName === "Insane Demon") return "#ffffff"; // white on blue
   if (tierName === "Fuck") return "#ff0000"; // red on black
-  return "#000000";
+  return tierFontColors[tierName] || "#000000";
+}
+
+function configuredOpinionFontColor_(fillColor, fallbackFontColor) {
+  const fill = hex_(fillColor);
+  if (fill === "#000000") return hex_(fallbackFontColor) || "#000000";
+  return opinionFontColorsByFill[fill] || hex_(fallbackFontColor) || "#000000";
 }
 
 function buildTierNameToColor_() {

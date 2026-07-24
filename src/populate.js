@@ -14,6 +14,14 @@ function populateSelectedLevel() {
   const ss = SpreadsheetApp.getActive();
   const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
 
+  if (typeof loadTierConfiguration_ === "function") {
+    const configResult = loadTierConfiguration_();
+    if (!configResult.valid && !configResult.missing) {
+      setAnalysisStatusMessage_(tool, "Error with Tier Configuration", "#fce8e6");
+      return false;
+    }
+  }
+
   const tierName = tool.getRange(TIER_CELL).getDisplayValue().trim();
   const levelName = tool.getRange(LEVEL_CELL).getDisplayValue().trim();
   if (!tierName || !levelName) {
@@ -67,7 +75,9 @@ function populateSelectedLevel() {
 
     outVals.push([v0, v1, v2]);
     outBgs.push(bgs[r]);
-    outFcs.push(fcs[r]);
+    const displayFontColors = fcs[r].slice();
+    displayFontColors[1] = configuredOpinionFontColor_(bgs[r][1], fcs[r][1]);
+    outFcs.push(displayFontColors);
   }
 
   if (outVals.length === 0) {

@@ -3,6 +3,11 @@ function onEdit(e) {
   if (!e) return;
   const range = e.range;
   const sh = range.getSheet();
+  if (sh.getName() === TIER_CONFIG_SHEET_NAME) {
+    tierConfigurationLoaded_ = false;
+    tierConfigurationResult_ = null;
+    return;
+  }
   if (sh.getName() !== ANALYSIS_SHEET_NAME) return;
 
   const a1 = range.getA1Notation();

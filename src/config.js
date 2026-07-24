@@ -2,7 +2,8 @@
 
 const ANALYSIS_SHEET_NAME = "Tier Analysis";
 const FLAG_SCAN_SHEET_NAME = "Tier Flags";
-const VERSION = "v1.5.2";
+const TIER_CONFIG_SHEET_NAME = "Tier Configuration";
+const VERSION = "v1.6.0";
 const TIER_CELL = "B1";
 const LEVEL_CELL = "B2";
 const DATA_START_ROW = 4;                      // where A:C gets populated
@@ -23,7 +24,9 @@ const FLAG_LOCK_MIN_WEIGHT = 50;
 const COUNTED_PLAYER_HIGHLIGHT = "#e6f4ea";
 
 function isAnalyzerUtilitySheetName_(name) {
-  return name === ANALYSIS_SHEET_NAME || name === FLAG_SCAN_SHEET_NAME;
+  return name === ANALYSIS_SHEET_NAME ||
+    name === FLAG_SCAN_SHEET_NAME ||
+    name === TIER_CONFIG_SHEET_NAME;
 }
 
 // reliability background color = multiplier
@@ -47,7 +50,7 @@ const reliabilityDistributionLevels = [
 ];
 
 // difficulty background color = tier name
-const difficultyColorNames = {
+const DEFAULT_DIFFICULTY_COLOR_NAMES = {
   "#0000ff": "Insane Demon",
   "#0b5394": "Insane Demon", // hard/insane demon
   "#4a86e8": "Beginner",
@@ -73,7 +76,7 @@ const difficultyColorNames = {
 };
 
 // split color = [lowerTierColor, higherTierColor]
-const splitPairs = {
+const DEFAULT_SPLIT_PAIRS = {
   "#1155cc": ["#0000ff", "#4a86e8"],
   "#31c0f0": ["#4a86e8", "#00ffff"],
   "#00ff80": ["#00ffff", "#00ff00"],
@@ -97,7 +100,7 @@ const splitPairs = {
 };
 
 // Tier ordering for split logic (low -> high)
-const orderedTierNames = [
+const DEFAULT_ORDERED_TIER_NAMES = [
   "Insane Demon",
   "Beginner",
   "Easy",
@@ -120,3 +123,17 @@ const orderedTierNames = [
   "Unreal",
   "Nightmare"
 ];
+
+// these objects are refreshed from the Tier Configuration sheet before analyzer actions
+const difficultyColorNames = Object.assign({}, DEFAULT_DIFFICULTY_COLOR_NAMES);
+const splitPairs = Object.assign({}, DEFAULT_SPLIT_PAIRS);
+const orderedTierNames = DEFAULT_ORDERED_TIER_NAMES.slice();
+const tierDecisionTargets = { "Insane Demon": "Beginner" };
+const tierFontColors = {
+  "Insane Demon": "#ffffff",
+  "Insane Demon/Beginner": "#ffffff"
+};
+const opinionFontColorsByFill = {
+  "#0000ff": "#ffffff",
+  "#1155cc": "#ffffff"
+};

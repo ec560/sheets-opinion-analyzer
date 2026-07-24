@@ -3,6 +3,16 @@ function analyzeSelectedLevel() {
   const ss = SpreadsheetApp.getActive();
   const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
 
+  if (typeof loadTierConfiguration_ === "function") {
+    const configResult = loadTierConfiguration_();
+    const configError = tierConfigurationErrorMessage_(configResult);
+    if (configError) {
+      setAnalysisStatusMessage_(tool, "Error with Tier Configuration", "#fce8e6");
+      SpreadsheetApp.getUi().alert(configError);
+      return;
+    }
+  }
+
   tool.getRange(OUTPUT_START_ROW, OUTPUT_COL, tool.getMaxRows(), OUTPUT_WIDTH).clearContent().breakApart();
 
   const tierName = tool.getRange(TIER_CELL).getDisplayValue().trim();

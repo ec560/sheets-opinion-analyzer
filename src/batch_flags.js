@@ -2,6 +2,14 @@ function scanSelectedTierFlags() {
   const ss = SpreadsheetApp.getActive();
   const ui = SpreadsheetApp.getUi();
   const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
+  if (typeof loadTierConfiguration_ === "function") {
+    const configResult = loadTierConfiguration_();
+    const configError = tierConfigurationErrorMessage_(configResult);
+    if (configError) {
+      ui.alert("Error with Tier Configuration", configError, ui.ButtonSet.OK);
+      return;
+    }
+  }
   const tierName = getFlagScanTierName_(ss, tool);
 
   if (!tierName) {
