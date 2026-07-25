@@ -85,6 +85,8 @@ After pushing, refresh the spreadsheet. A `Tier Tools` menu should appear with t
 
 Run `Setup` once to create the `Tier Analysis` sheet.
 
+Setup also creates a `Tier Configuration` sheet. Paste a single formatted list into its first column: ordinary rows are tiers and any optional row containing`/` marks a split between its neighboring tiers. Split wording is not otherwise validated. Row order becomes tier order, and each pasted cell's fill and font color become the corresponding analyzer colors. Two optional fields let multiple outer tier names count toward the bottom or top placement tier. The analyzer reads and validates changes automatically.
+
 ## Sheet Layout
 
 The analyzer expects the spreadsheet to follow a specific layout.
@@ -97,9 +99,9 @@ Player | Opinion | Reliability
 
 Opinion rows begin on `row 2`.
 
-The analyzer depends on cell colors to gather opinion data. The tier is derived from cell colors, and reliability weighting also depends on cell colors rather than text alone. The current tier ordering, difficulty colors, split colors, and reliability mappings are defined in [`src/config.js`](./src/config.js).
+The analyzer depends on cell colors to gather opinion data. The tier is derived from cell colors, and reliability weighting also depends on cell colors rather than text alone. By default, a black-background Fuck opinion contributes to "Insane" tier only when its text explicitly mentions both `Fuck` and `Insane` and its font is red. Tier ordering, difficulty colors, alternate colors, and split borders are managed in the `Tier Configuration` sheet. Reliability mappings are defined in [`src/config.js`](./src/config.js).
 
-One thing to be aware of is that the tier dropdown includes every sheet in the workbook except analyzer utility sheets like `Tier Analysis` and `Tier Flags`. If your spreadsheet contains unrelated sheets, they will appear in the selector as well.
+One thing to be aware of is that the tier dropdown includes every sheet in the workbook except analyzer utility sheets (`Tier Analysis`, `Tier Flags`, and `Tier Configuration`). If your spreadsheet contains unrelated sheets, they will appear in the selector as well.
 
 ## Using the Analyzer
 
@@ -107,7 +109,7 @@ Open the `Tier Analysis` sheet created by setup. Select a tier in cell `B1`, the
 
 If the source sheet changes and you want to reload the selected level, use the `Tier Tools -> Refresh`. If you only want to rerun the calculations on the currently loaded data, use `Tier Tools -> Analyze Selected Level`.
 
-The output panel includes the selected tier and level, total weighted opinions, weighted top vote and runner-up, mean, median, outliers, standard deviation, split totals, a `Place/Move` decision, and a tier distribution table. When applicable, it also displays `Fuck` opinion percentage and related verdict handling.
+The output panel includes the selected tier and level, total weighted opinions, weighted top vote and runner-up, mean, median, outliers, standard deviation, split totals, a `Place/Move` decision, a tier distribution table, and a reliability distribution table. When applicable, it also displays `Fuck` opinion percentage and related verdict handling.
 
 ### Tier Flag Scan
 
