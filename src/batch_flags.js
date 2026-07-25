@@ -1,3 +1,59 @@
+const TIER_FLAG_STYLES = {
+  movement: {
+    priority: 1,
+    background: "#b3261e",
+    text: "#ffffff",
+    fontWeight: "bold",
+    styleDifference: false
+  },
+  book: {
+    priority: 2,
+    background: "#f9ab00",
+    text: "#3c2400",
+    fontWeight: "bold",
+    styleDifference: true
+  },
+  lock: {
+    priority: 3,
+    background: "#d2e3fc",
+    text: "#174ea6",
+    fontWeight: "bold",
+    styleDifference: false
+  },
+  needs_more: {
+    priority: 4,
+    background: "#fef7e0",
+    text: "#7a4f01",
+    fontWeight: "bold",
+    styleDifference: true
+  },
+  low_unsettled: {
+    priority: 5,
+    background: "#fce8e6",
+    text: "#b3261e",
+    fontWeight: "bold",
+    styleDifference: true
+  },
+  low_solid: {
+    priority: 6,
+    background: "#f1f3f4",
+    text: "#5f6368",
+    fontWeight: "normal",
+    styleDifference: true
+  },
+  neutral: {
+    priority: 99,
+    background: "#f5f5f5",
+    text: "#202124",
+    fontWeight: "bold",
+    styleDifference: false
+  }
+};
+
+function tierFlagStyle_(styleKey) {
+  return TIER_FLAG_STYLES[styleKey] || TIER_FLAG_STYLES.neutral;
+}
+
 function scanSelectedTierFlags() {
   const ss = SpreadsheetApp.getActive();
   const ui = SpreadsheetApp.getUi();
@@ -132,11 +188,13 @@ function isBlankFlagOpinionRow_(row) {
 
 function buildLevelFlagSummary_(analysis) {
   let flag = "";
+  let styleKey = "";
   let differenceAlert = analysis.isLockWorthy ? null : analysis.difference;
   const needsMoreOpinionsAlert = buildNeedsMoreOpinionsAlert_(analysis);
   const lowOpinionAlert = buildLowOpinionAlert_(analysis);
 
   if (analysis.canMove) {
+    styleKey = "movement";
     if (analysis.isPending) {
       flag = "placement alert (" + analysis.verdictTier + ")";
     } else {
@@ -144,20 +202,26 @@ function buildLevelFlagSummary_(analysis) {
       flag = "move alert (" + analysis.verdictTier + direction + ")";
     }
   } else if (analysis.isLockWorthy) {
+    styleKey = "lock";
     flag = "lock alert (" + (analysis.lockSharePct * 100).toFixed(0) + "% " + analysis.lockSideLabel + ")";
   } else if (analysis.bookAlert) {
+    styleKey = "book";
     flag = formatBookAlert_(analysis.bookAlert);
     differenceAlert = analysis.bookAlert;
   } else if (needsMoreOpinionsAlert) {
+    styleKey = "needs_more";
     flag = "needs more opinions";
     differenceAlert = needsMoreOpinionsAlert;
   } else if (lowOpinionAlert) {
+    styleKey = lowOpinionAlert.subdued ? "low_solid" : "low_unsettled";
     flag = lowOpinionAlert.text;
   }
 
   return {
     flags: flag ? [flag] : [],
     differenceAlert,
+    styleKey,
+    priority: tierFlagStyle_(styleKey).priority,
     subduedLowOpinion: !!(lowOpinionAlert && lowOpinionAlert.subdued && flag === lowOpinionAlert.text)
   };
 }
@@ -219,6 +283,8 @@ function buildTierFlagRow_(analysis, flagSummary) {
       formatFlagNumber_(analysis.tierSplit.left.weight) + " | " + formatFlagNumber_(analysis.tierSplit.right.weight),
       formatDifference_(flagSummary.differenceAlert)
     ],
+    styleKey: flagSummary.styleKey || "",
+    priority: flagSummary.priority || 99,
     subduedLowOpinion: !!flagSummary.subduedLowOpinion
   };
 }
@@ -226,8 +292,6 @@ function buildTierFlagRow_(analysis, flagSummary) {
 function renderTierFlagScan_(ss, tierName, flagRows) {
   let sh = ss.getSheetByName(FLAG_SCAN_SHEET_NAME);
   if (!sh) sh = ss.insertSheet(FLAG_SCAN_SHEET_NAME);
-
-  sh.clear();
 
   const headers = [
     "Level",
@@ -238,6 +302,8 @@ function renderTierFlagScan_(ss, tierName, flagRows) {
     "Split totals",
     "Difference"
   ];
+  setManagedSheetColumnCount_(sh, headers.length);
+  sh.clear();
 
   const titleRow = new Array(headers.length).fill("");
   titleRow[0] = "Tier flag scan";
@@ -262,10 +328,6 @@ function renderTierFlagScan_(ss, tierName, flagRows) {
 function formatTierFlagScan_(sh, rows, colCount, flagRows) {
   const rowCount = rows.length;
   if (rowCount === 0 || colCount === 0) return;
-  const subduedLowOpinionBg = "#f3f3f3";
-  const subduedLowOpinionText = "#5f6368";
-  const subduedLowOpinionDiffBg = "#fafafa";
-  const subduedLowOpinionDiffText = "#6f7277";
 
   sh.setHiddenGridlines(true);
   sh.getRange(1, 1, rowCount, colCount)
@@ -311,7 +373,7 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
     const rowNum = i + 1;
     const row = rows[i];
     const flagRow = flagRows && flagRows.length > (i - 2) ? flagRows[i - 2] : null;
-    const subduedLowOpinion = !!(flagRow && flagRow.subduedLowOpinion);
+    const flagStyle = tierFlagStyle_(flagRow && flagRow.styleKey);
 
     if (String(row[0] || "") === "No flagged levels") {
       sh.getRange(rowNum, 1, 1, colCount)
@@ -321,44 +383,23 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
       continue;
     }
 
-    const flagText = String(row[3] || "").toLowerCase();
     const differenceCell = sh.getRange(rowNum, 7);
     sh.getRange(rowNum, 1, 1, colCount)
       .setBorder(false, false, true, false, false, false, "#eeeeee", SpreadsheetApp.BorderStyle.SOLID);
 
-    sh.getRange(rowNum, 1).setFontWeight(subduedLowOpinion ? "normal" : "bold");
+    sh.getRange(rowNum, 1).setFontWeight(flagStyle.fontWeight);
 
     const flagCell = sh.getRange(rowNum, 4);
-    if (subduedLowOpinion) {
-      flagCell
-        .setBackground(subduedLowOpinionBg)
-        .setFontColor(subduedLowOpinionText)
-        .setFontWeight("normal");
-    } else if (flagText.indexOf("low opinion count") >= 0) {
-      flagCell
-        .setBackground("#fce8e6")
-        .setFontColor("#b71c1c")
-        .setFontWeight("bold");
-    } else {
-      flagCell
-        .setBackground(flagBackground_(flagText))
-        .setFontColor("#202124")
-        .setFontWeight("bold");
-    }
+    flagCell
+      .setBackground(flagStyle.background)
+      .setFontColor(flagStyle.text)
+      .setFontWeight(flagStyle.fontWeight);
 
-    if (!subduedLowOpinion) {
-      if (flagText.indexOf("red book alert") >= 0) {
-        differenceCell.setBackground("#fce8e6").setFontWeight("bold");
-      } else if (flagText.indexOf("green book alert") >= 0) {
-        differenceCell.setBackground("#e6f4ea").setFontWeight("bold");
-      } else if (flagText.indexOf("needs more opinions") >= 0) {
-        differenceCell.setBackground("#fce8e6").setFontWeight("bold");
-      }
-    } else {
+    if (flagStyle.styleDifference) {
       differenceCell
-        .setBackground(subduedLowOpinionDiffBg)
-        .setFontColor(subduedLowOpinionDiffText)
-        .setFontWeight("normal");
+        .setBackground(flagStyle.background)
+        .setFontColor(flagStyle.text)
+        .setFontWeight(flagStyle.fontWeight);
     }
   }
 }
@@ -375,23 +416,6 @@ function styleTierFlagCell_(sh, row, col, tierName) {
     .setBackground(hex)
     .setFontColor(tierTextColor_(name))
     .setFontWeight("bold");
-}
-
-function flagBackground_(flagText) {
-  if (flagText.indexOf("move alert") >= 0 || flagText.indexOf("placement alert") >= 0) {
-    return "#e6f4ea";
-  }
-  if (
-    flagText.indexOf("low opinion count") >= 0 ||
-    flagText.indexOf("red book alert") >= 0 ||
-    flagText.indexOf("needs more opinions") >= 0
-  ) {
-    return "#fce8e6";
-  }
-  if (flagText.indexOf("green book alert") >= 0) {
-    return "#e6f4ea";
-  }
-  return "#fff4cc";
 }
 
 function formatFlagNumber_(value) {

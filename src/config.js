@@ -3,7 +3,7 @@
 const ANALYSIS_SHEET_NAME = "Tier Analysis";
 const FLAG_SCAN_SHEET_NAME = "Tier Flags";
 const TIER_CONFIG_SHEET_NAME = "Tier Configuration";
-const VERSION = "v1.6.1";
+const VERSION = "v1.7.0";
 const TIER_CELL = "B1";
 const LEVEL_CELL = "B2";
 const DATA_START_ROW = 4;                      // where A:C gets populated

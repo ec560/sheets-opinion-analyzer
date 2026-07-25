@@ -1,4 +1,13 @@
 // setup
+function setManagedSheetColumnCount_(sh, requiredColumns) {
+  const currentColumns = sh.getMaxColumns();
+  if (currentColumns > requiredColumns) {
+    sh.deleteColumns(requiredColumns + 1, currentColumns - requiredColumns);
+  } else if (currentColumns < requiredColumns) {
+    sh.insertColumnsAfter(currentColumns, requiredColumns - currentColumns);
+  }
+}
+
 function setupTierAnalysis() {
   const ss = SpreadsheetApp.getActive();
   if (typeof setupTierConfiguration_ !== "function") {
@@ -9,6 +18,7 @@ function setupTierAnalysis() {
   loadTierConfiguration_();
   let sh = ss.getSheetByName(ANALYSIS_SHEET_NAME);
   if (!sh) sh = ss.insertSheet(ANALYSIS_SHEET_NAME);
+  setManagedSheetColumnCount_(sh, OUTPUT_COL + OUTPUT_WIDTH - 1);
 
   // Basic layout
   sh.clear();

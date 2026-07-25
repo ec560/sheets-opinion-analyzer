@@ -57,10 +57,14 @@ function tierRowsToPasteList_(rows) {
 function setupTierConfiguration_() {
   const ss = SpreadsheetApp.getActive();
   let sh = ss.getSheetByName(TIER_CONFIG_SHEET_NAME);
+  if (sh) setManagedSheetColumnCount_(sh, 5);
   if (sh && String(sh.getRange("A4").getDisplayValue()).trim() === "Paste tier list") {
     return sh;
   }
-  if (!sh) sh = ss.insertSheet(TIER_CONFIG_SHEET_NAME);
+  if (!sh) {
+    sh = ss.insertSheet(TIER_CONFIG_SHEET_NAME);
+    setManagedSheetColumnCount_(sh, 5);
+  }
 
   const rows = defaultTierConfigRows_();
   const pasted = tierRowsToPasteList_(rows);
