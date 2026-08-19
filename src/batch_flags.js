@@ -41,6 +41,55 @@ const TIER_FLAG_STYLES = {
     fontWeight: "normal",
     styleDifference: true
   },
+  pending_natural: {
+    priority: 2,
+    background: "#fef7e0",
+    text: "#7a4f01",
+    fontWeight: "bold",
+    styleDifference: true
+  },
+  pending_no_opinions: {
+    priority: 3,
+    background: "#fce8e6",
+    text: "#b3261e",
+    fontWeight: "bold",
+    styleDifference: false
+  },
+  pending_high_count: {
+    priority: 4,
+    background: "#d2e3fc",
+    text: "#174ea6",
+    fontWeight: "bold",
+    styleDifference: false
+  },
+  pending_split: {
+    priority: 5,
+    background: "#f3e8fd",
+    text: "#681da8",
+    fontWeight: "bold",
+    styleDifference: true
+  },
+  pending_strong_split: {
+    priority: 6,
+    background: "#f5f0fa",
+    text: "#684c87",
+    fontWeight: "normal",
+    styleDifference: true
+  },
+  pending_low_count: {
+    priority: 8,
+    background: "#f8f9fa",
+    text: "#6f7277",
+    fontWeight: "normal",
+    styleDifference: false
+  },
+  pending_low_reliability: {
+    priority: 7,
+    background: "#e8eaed",
+    text: "#4a4d52",
+    fontWeight: "normal",
+    styleDifference: false
+  },
   neutral: {
     priority: 99,
     background: "#f5f5f5",
@@ -133,9 +182,12 @@ function buildTierFlagScan_(tierName, tierSheet) {
       levelData.bgs,
       levelData.fcs
     );
-    if (analysis.rawCount === 0 && analysis.allAndFuck === 0) return;
+    if (!analysis.isPending && analysis.rawCount === 0 && analysis.allAndFuck === 0) return;
 
-    const flagSummary = buildLevelFlagSummary_(analysis);
+    const flagContext = analysis.isPending
+      ? buildPendingFlagContext_(levelData, analysis.countedRowFlags)
+      : null;
+    const flagSummary = buildLevelFlagSummary_(analysis, flagContext);
     if (flagSummary.flags.length > 0) rows.push(buildTierFlagRow_(analysis, flagSummary));
   });
 
@@ -186,7 +238,11 @@ function isBlankFlagOpinionRow_(row) {
     String(row[2]).trim() === "";
 }
 
-function buildLevelFlagSummary_(analysis) {
+function buildLevelFlagSummary_(analysis, flagContext) {
+  if (analysis && analysis.isPending) {
+    return buildPendingLevelFlagSummary_(analysis, flagContext || {});
+  }
+
   let flag = "";
   let styleKey = "";
   let differenceAlert = analysis.isLockWorthy ? null : analysis.difference;
@@ -224,6 +280,96 @@ function buildLevelFlagSummary_(analysis) {
     priority: tierFlagStyle_(styleKey).priority,
     subduedLowOpinion: !!(lowOpinionAlert && lowOpinionAlert.subdued && flag === lowOpinionAlert.text)
   };
+}
+
+function buildPendingLevelFlagSummary_(analysis, flagContext) {
+  let flag = "";
+  let styleKey = "";
+  let differenceAlert = null;
+  const recentExternalSource = flagContext.mostRecentExternalSource || "";
+  const splitMargin = analysis.decisionTierSplit
+    ? Number(analysis.decisionTierSplit.marginWeight) || 0
+    : 0;
+
+  if (analysis.canMove && !recentExternalSource) {
+    styleKey = "movement";
+    flag = "placement alert (" + analysis.verdictTier + ")";
+  } else if (analysis.canMove && recentExternalSource) {
+    styleKey = "pending_natural";
+    flag = "requires natural opinion to place";
+    differenceAlert = analysis.difference;
+  } else if (analysis.rawCount === 0 && analysis.allAndFuck === 0) {
+    styleKey = "pending_no_opinions";
+    flag = "no opinions";
+  } else if (analysis.rawCount >= PENDING_SCAN_HIGH_OPINION_MIN_RAW_COUNT) {
+    styleKey = "pending_high_count";
+    flag = "high opinion count (" + analysis.rawCount + ")";
+  } else if (splitMargin === PENDING_SCAN_NEAR_PLACEMENT_MARGIN) {
+    styleKey = "pending_split";
+    flag = "+2.75 split (+" + formatFlagNumber_(splitMargin) + " " + analysis.verdictBaseName + ")";
+    differenceAlert = analysis.difference;
+  } else if (splitMargin >= PENDING_SCAN_STRONG_SPLIT_MARGIN) {
+    styleKey = "pending_strong_split";
+    flag = "close to placement";
+    differenceAlert = analysis.difference;
+  } else if (!flagContext.hasGreenOrBlueReliability) {
+    styleKey = "pending_low_reliability";
+    flag = "low reliabilities (no green/blue)";
+  } else if (analysis.rawCount <= PENDING_SCAN_LOW_OPINION_MAX_RAW_COUNT) {
+    styleKey = "pending_low_count";
+    flag = "low opinion count (" + analysis.rawCount + "/3)";
+  }
+
+  return {
+    flags: flag ? [flag] : [],
+    differenceAlert,
+    styleKey,
+    priority: tierFlagStyle_(styleKey).priority,
+    subduedLowOpinion: false
+  };
+}
+
+function buildPendingFlagContext_(levelData, countedRowFlags) {
+  const vals = levelData && levelData.vals ? levelData.vals : [];
+  const bgs = levelData && levelData.bgs ? levelData.bgs : [];
+  const counted = countedRowFlags || [];
+  let mostRecentExternalSource = "";
+  let hasGreenOrBlueReliability = false;
+
+  for (let row = 0; row < counted.length; row++) {
+    if (!counted[row]) continue;
+    const reliabilityColor = hex_(bgs[row] && bgs[row][2]);
+    if (reliabilityColor === "#00ff00" || reliabilityColor === "#00ffff") {
+      hasGreenOrBlueReliability = true;
+    }
+  }
+
+  for (let row = counted.length - 1; row >= 0; row--) {
+    if (!counted[row]) continue;
+    mostRecentExternalSource = externalOpinionSource_(vals[row] && vals[row][2]);
+    break;
+  }
+
+  return {
+    mostRecentExternalSource,
+    hasGreenOrBlueReliability
+  };
+}
+
+function externalOpinionSource_(reliabilityText) {
+  const value = String(reliabilityText || "").trim();
+  const sources = [
+    { pattern: /\baredl\b/i, label: "AREDL opinions" },
+    { pattern: /\budl\b/i, label: "UDL opinions" },
+    { pattern: /\bexternal\b/i, label: "External opinions" },
+    { pattern: /\bextrapolated\b/i, label: "Extrapolated opinions" },
+    { pattern: /\bgddl\b/i, label: "GDDL opinions" }
+  ];
+
+  for (const source of sources) {
+    if (source.pattern.test(value)) return source.label;
+  }
+  return "";
 }
 
 function buildLowOpinionAlert_(analysis) {

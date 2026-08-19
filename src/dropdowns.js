@@ -66,26 +66,79 @@ function getLevelHeaders_(tierSheet) {
   // each level occupies 3 columns: [player, opinion, reliability].
   const headerRow = 1;
   const lastCol = tierSheet.getLastColumn();
-  const values = tierSheet.getRange(headerRow, 1, 1, lastCol).getDisplayValues()[0];
+  const headerRange = tierSheet.getRange(headerRow, 1, 1, lastCol);
+  const values = headerRange.getDisplayValues()[0];
+  const canReadMergedRanges = typeof headerRange.getMergedRanges === "function";
+  const mergedHeaderWidths = {};
+
+  if (canReadMergedRanges) {
+    const mergedRanges = headerRange.getMergedRanges();
+    for (const mergedRange of mergedRanges) {
+      if (mergedRange.getRow() !== headerRow || mergedRange.getNumRows() !== 1) continue;
+      mergedHeaderWidths[mergedRange.getColumn()] = mergedRange.getNumColumns();
+    }
+  }
 
   const headers = [];
   for (let c = 1; c <= lastCol; c++) {
     const name = (values[c - 1] || "").trim();
     if (!name) continue;
 
-    // treat any non-empty header cell as a level name
+    // Real level headers span their three data columns. Wider merged headings are
+    // section labels, regardless of their text. Keep the fallback for simple
+    // mocks or legacy callers that cannot provide merged-range metadata.
+    if (canReadMergedRanges && mergedHeaderWidths[c] !== 3) continue;
+
     headers.push({ name, col: c });
+  }
+
+  let levelHeaders = headers;
+  if (canReadMergedRanges && typeof tierSheet.getLastRow === "function") {
+    const bodyRowCount = Math.max(0, tierSheet.getLastRow() - headerRow);
+    const bodyValues = bodyRowCount > 0
+      ? tierSheet.getRange(headerRow + 1, 1, bodyRowCount, lastCol).getDisplayValues()
+      : [];
+
+    levelHeaders = headers.filter((header, index) => {
+      return !isAlphabeticalSectionHeader_(headers, index, bodyValues);
+    });
   }
 
   // Remove duplicates in case merged headers repeat
   const out = [];
   const seen = new Set();
-  for (const h of headers) {
+  for (const h of levelHeaders) {
     if (seen.has(h.name)) continue;
     seen.add(h.name);
     out.push(h);
   }
   return out;
+}
+
+function isAlphabeticalSectionHeader_(headers, index, bodyValues) {
+  const current = headers[index];
+  const next = headers[index + 1];
+  const afterNext = headers[index + 2];
+  if (!current || !next || !afterNext) return false;
+  if (headerGroupHasData_(bodyValues, current.col)) return false;
+
+  const currentName = current.name.toLocaleLowerCase();
+  const nextName = next.name.toLocaleLowerCase();
+  const afterNextName = afterNext.name.toLocaleLowerCase();
+  const resetsAfterCurrent = nextName.localeCompare(currentName) < 0;
+  const ascendingRunResumes = afterNextName.localeCompare(nextName) >= 0;
+
+  return resetsAfterCurrent && ascendingRunResumes;
+}
+
+function headerGroupHasData_(bodyValues, startCol) {
+  const startIndex = startCol - 1;
+  for (const row of bodyValues) {
+    for (let offset = 0; offset < 3; offset++) {
+      if (String(row[startIndex + offset] || "").trim() !== "") return true;
+    }
+  }
+  return false;
 }
 
 // clear A:C and output area
