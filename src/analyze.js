@@ -42,7 +42,7 @@ function analyzeSelectedLevel() {
     fuckWeight,
     tierWeightSum,
     allWeight,
-    allAndFuck,
+    totalWeight,
     rawCount,
     rawMeanIdx,
     rawMedianIdx,
@@ -78,7 +78,7 @@ function analyzeSelectedLevel() {
   const out = [];
   out.push([`Tier sheet`, tierName, "", ""]);
   out.push([`Level`, levelName, "", ""]);
-  out.push([`Total weighted opinions`, allAndFuck, "", VERSION]);
+  out.push([`Total weighted opinions`, totalWeight, "", VERSION]);
   out.push([`Most votes (weighted)`, topTier, topWeight, ""]);
   out.push([`Runner-up (weighted)`, secondTier, secondWeight, ""]);
   out.push([`Tier Mean`, rawMeanLabel, rawMeanIdx, ""]);
