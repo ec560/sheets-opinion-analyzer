@@ -91,8 +91,7 @@ function populateSelectedLevel() {
   dest.setFontColors(outFcs);
 
   try {
-    analyzeSelectedLevel();
-    return true;
+    return analyzeSelectedLevel() !== false;
   } catch (e) {
     setAnalysisStatusMessage_(tool, "Failed to analyze opinions", "#fce8e6");
     return false;

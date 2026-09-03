@@ -35,6 +35,12 @@ function analyzeSelectedLevel() {
   const fcs = rng.getFontColors();
 
   const analysis = calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs);
+  if (analysis.rawCount === 0) {
+    applyCountedPlayerHighlights_(tool, DATA_START_ROW, bgs, analysis.countedRowFlags);
+    setAnalysisStatusMessage_(tool, "No usable opinions", "#fce8e6");
+    return false;
+  }
+
   const {
     weightsByTier,
     countedRowFlags,
@@ -181,6 +187,7 @@ function analyzeSelectedLevel() {
   );
 
   applyCountedPlayerHighlights_(tool, DATA_START_ROW, bgs, countedRowFlags);
+  return true;
 }
 
 function getVisibleDistributionNames_(orderedNames, weightsByName) {
