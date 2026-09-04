@@ -419,14 +419,15 @@ function buildNeedsMoreOpinionsAlert_(analysis) {
 }
 
 function buildTierFlagRow_(analysis, flagSummary) {
+  const comparison = analysis.placementComparison || analysis.decisionTierSplit || analysis.tierSplit;
   return {
     values: [
       analysis.levelName,
       formatFlagNumber_(analysis.allWeight),
       analysis.rawCount,
       flagSummary.flags.join("; "),
-      analysis.tierSplit.left.label + " / " + analysis.tierSplit.right.label,
-      formatFlagNumber_(analysis.tierSplit.left.weight) + " | " + formatFlagNumber_(analysis.tierSplit.right.weight),
+      comparison.left.label + " / " + comparison.right.label,
+      formatFlagNumber_(comparison.left.weight) + " | " + formatFlagNumber_(comparison.right.weight),
       formatDifference_(flagSummary.differenceAlert)
     ],
     styleKey: flagSummary.styleKey || "",
@@ -444,8 +445,8 @@ function renderTierFlagScan_(ss, tierName, flagRows) {
     "Weight",
     "Raw",
     "Flags",
-    "Split",
-    "Split totals",
+    "Decision split",
+    "Decision totals",
     "Difference"
   ];
   setManagedSheetColumnCount_(sh, headers.length);

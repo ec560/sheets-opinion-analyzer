@@ -243,11 +243,15 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
   const verdictIdx = decisionTierSplit.winner.index;
   const verdictBaseName = decisionOrderedTierNames[verdictIdx];
   const requiresFuckPlacementMargin = fuckPresent && verdictTier !== "Fuck";
-  const fuckPlacementComparison = requiresFuckPlacementMargin
+  const fuckPlacementComparison = fuckPresent
     ? buildFuckPlacementComparison_(decisionTierSplit, verdictBaseName, fuckWeight, totalWeight, splitThreshold)
     : null;
-  const passesFuckPlacementMargin = !fuckPlacementComparison || fuckPlacementComparison.passesWeightThreshold;
-  const placementGate = selectPlacementComparison_(decisionTierSplit, fuckPlacementComparison, "");
+  const passesFuckPlacementMargin = !requiresFuckPlacementMargin || fuckPlacementComparison.passesWeightThreshold;
+  const placementGate = selectPlacementComparison_(
+    decisionTierSplit,
+    requiresFuckPlacementMargin ? fuckPlacementComparison : null,
+    ""
+  );
 
   let canMove = false;
   if (fuckPresent) {
@@ -319,11 +323,13 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     passesSplitPct,
     isLockWorthy
   });
-  const placementComparison = selectPlacementComparison_(
-    decisionTierSplit,
-    fuckPlacementComparison,
-    moveFailureReason
-  );
+  const placementComparison = verdictTier === "Fuck"
+    ? fuckPlacementComparison
+    : selectPlacementComparison_(
+      decisionTierSplit,
+      fuckPlacementComparison,
+      moveFailureReason
+    );
 
   return {
     tierName,
