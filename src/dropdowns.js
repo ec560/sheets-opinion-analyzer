@@ -35,6 +35,8 @@ function onOpen() {
     .addItem("Refresh", "populateSelectedLevel")
     .addItem("Analyze Selected Level", "analyzeSelectedLevel")
     .addSeparator()
+    .addItem("Lock/Unlock Selected Level", "toggleSelectedLevelLock")
+    .addSeparator()
     .addItem("Scan Tier Flags", "scanSelectedTierFlags")
     .addToUi();
 }
