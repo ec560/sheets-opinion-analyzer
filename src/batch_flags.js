@@ -445,8 +445,8 @@ function renderTierFlagScan_(ss, tierName, flagRows) {
     "Weight",
     "Raw",
     "Flags",
-    "Decision split",
-    "Decision totals",
+    "Split",
+    "Split totals",
     "Difference"
   ];
   setManagedSheetColumnCount_(sh, headers.length);

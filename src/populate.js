@@ -13,6 +13,7 @@ function safeCellValue_(v) {
 function populateSelectedLevel() {
   const ss = SpreadsheetApp.getActive();
   const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
+  refreshTierDropdown_();
 
   if (typeof loadTierConfiguration_ === "function") {
     const configResult = loadTierConfiguration_();

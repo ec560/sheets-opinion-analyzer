@@ -21,6 +21,10 @@ function analyzeSelectedLevel() {
     SpreadsheetApp.getUi().alert("Pick a tier and a level first.");
     return;
   }
+  if (!isTierSheetName_(tierName)) {
+    setAnalysisStatusMessage_(tool, "Select a tier sheet", "#fce8e6");
+    return false;
+  }
 
   const lastRow = tool.getLastRow();
   if (lastRow < DATA_START_ROW) {

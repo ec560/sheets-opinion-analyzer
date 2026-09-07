@@ -33,6 +33,31 @@ function isAnalyzerUtilitySheetName_(name) {
     name === TIER_CONFIG_SHEET_NAME;
 }
 
+// Shared eligibility for selectors and actions that operate on source tier sheets.
+function isTierSheetName_(name) {
+  if (!name || isAnalyzerUtilitySheetName_(name)) return false;
+  if (typeof loadTierConfiguration_ === "function") {
+    const result = loadTierConfiguration_();
+    if (!result.valid && !result.missing) return false;
+  }
+  return orderedTierNames.includes(name) || 
+    String(name).toLowerCase() === "pending" || name === "Fuck";
+}
+
+function getTierSheets_(ss) {
+  return ss.getSheets().filter(sheet => isTierSheetName_(sheet.getName()));
+}
+
+function getSelectedTierSheet_(ss, tool) {
+  const active = ss.getActiveSheet();
+  if (active && isTierSheetName_(active.getName())) return active;
+
+  const analysisSheet = tool || ss.getSheetByName(ANALYSIS_SHEET_NAME);
+  if (!analysisSheet) return null;
+  const selectedName = String(analysisSheet.getRange(TIER_CELL).getDisplayValue() || "").trim();
+  return isTierSheetName_(selectedName) ? ss.getSheetByName(selectedName) : null;
+}
+
 // reliability background color = multiplier
 const reliabilityFactors = {
   "#00ffff": 1.25,

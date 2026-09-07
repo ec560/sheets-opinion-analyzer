@@ -75,7 +75,7 @@ function setSelectedLevelLockState_(shouldLock) {
 
 function getSelectedLevelForLocking_(ss) {
   const sheet = ss.getActiveSheet();
-  if (!sheet || isAnalyzerUtilitySheetName_(sheet.getName())) return null;
+  if (!sheet || !isTierSheetName_(sheet.getName())) return null;
 
   const activeCell = sheet.getActiveCell();
   if (!activeCell) return null;

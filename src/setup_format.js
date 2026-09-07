@@ -30,17 +30,7 @@ function setupTierAnalysis() {
 
   sh.getRange("A3:C3").setValues([["Player", "Opinion", "Reliability"]]);
 
-  // Populate tier dropdown from sheet names (each tier is its own sheet)
-  const tierSheetNames = ss.getSheets()
-    .map(s => s.getName())
-    .filter(name => !isAnalyzerUtilitySheetName_(name));
-
-  const dvTier = SpreadsheetApp.newDataValidation()
-    .requireValueInList(tierSheetNames, true)
-    .setAllowInvalid(false)
-    .build();
-
-  sh.getRange(TIER_CELL).setDataValidation(dvTier);
+  refreshTierDropdown_();
 
   // Clear level validation until tier selected
   sh.getRange(LEVEL_CELL).clearDataValidations();

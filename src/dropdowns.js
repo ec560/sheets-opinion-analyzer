@@ -6,12 +6,14 @@ function onEdit(e) {
   if (sh.getName() === TIER_CONFIG_SHEET_NAME) {
     tierConfigurationLoaded_ = false;
     tierConfigurationResult_ = null;
+    refreshTierDropdown_();
     return;
   }
   if (sh.getName() !== ANALYSIS_SHEET_NAME) return;
 
   const a1 = range.getA1Notation();
   if (a1 === TIER_CELL) {
+    refreshTierDropdown_();
     refreshLevelDropdown_();
 
     // tier change invalidates the previously selected level
@@ -39,6 +41,35 @@ function onOpen() {
     .addSeparator()
     .addItem("Scan Tier Flags", "scanSelectedTierFlags")
     .addToUi();
+  refreshTierDropdown_();
+}
+
+function refreshTierDropdown_() {
+  const ss = SpreadsheetApp.getActive();
+  const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
+  if (!tool) return;
+
+  const names = getTierSheets_(ss).map(sheet => sheet.getName());
+  const cell = tool.getRange(TIER_CELL);
+  const selectedName = String(cell.getDisplayValue() || "").trim();
+  const validation = SpreadsheetApp.newDataValidation().setAllowInvalid(false);
+  if (names.length) {
+    validation.requireValueInList(names, true);
+  } else {
+    // Keep an empty selector closed to arbitrary sheet names.
+    validation.requireFormulaSatisfied("=FALSE");
+  }
+  cell.setDataValidation(validation.build());
+  cell.setNote(names.length
+    ? "Pick a configured tier sheet."
+    : "No eligible tier sheets. Check Tier Configuration and sheet names.");
+
+  if (selectedName && !names.includes(selectedName)) {
+    cell.clearContent();
+    tool.getRange(LEVEL_CELL).clearContent().clearDataValidations();
+    clearAnalysisArea_();
+    renderAnalysisStatus_(tool);
+  }
 }
 
 // when a level is selected, populate A:C with player/opinion/reliability for that level
@@ -46,7 +77,7 @@ function refreshLevelDropdown_() {
   const ss = SpreadsheetApp.getActive();
   const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
   const tierName = tool.getRange(TIER_CELL).getDisplayValue().trim();
-  if (!tierName) return;
+  if (!isTierSheetName_(tierName)) return;
 
   const tierSheet = ss.getSheetByName(tierName);
   if (!tierSheet) return;
