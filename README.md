@@ -81,6 +81,7 @@ After pushing, refresh the spreadsheet. A `Tier Tools` menu should appear with t
 - `Setup`
 - `Refresh`
 - `Analyze Selected Level`
+- `Lock/Unlock Selected Level`
 - `Scan Tier Flags`
 
 Run `Setup` once to create the `Tier Analysis` sheet.
@@ -91,13 +92,15 @@ Setup also creates a `Tier Configuration` sheet. Paste a single formatted list i
 
 The analyzer expects the spreadsheet to follow a specific layout.
 
-Each tier should have its own sheet. The sheet name is used directly by the analyzer, so it should match the tier you want to analyze. On each tier sheet, `row 1` should contain level names. Every level should occupy three columns in the following order:
+Each tier should have its own sheet. The sheet name is used directly by the analyzer, so it should match the tier you want to analyze. On each tier sheet, `row 1` should contain level names. Every level header should be merged across exactly three columns in the following order:
 
 ```text
 Player | Opinion | Reliability
 ```
 
 Opinion rows begin on `row 2`.
+
+Row 1 headings merged across any width other than three columns are treated as section labels and excluded from level dropdowns and flag scans. A three-column, empty heading is also excluded when the following headers restart alphabetically and then continue in ascending order. This filters headings such as `Medium Tier`, `Classic`, and `Platformer` by structure and placement rather than by name, so an actual level may still use one of those names.
 
 The analyzer depends on cell colors to gather opinion data. The tier is derived from cell colors, and reliability weighting also depends on cell colors rather than text alone. By default, a black-background Fuck opinion contributes to "Insane" tier only when its text explicitly mentions both `Fuck` and `Insane` and its font is red. Tier ordering, difficulty colors, alternate colors, and split borders are managed in the `Tier Configuration` sheet. Reliability mappings are defined in [`src/config.js`](./src/config.js).
 
@@ -109,13 +112,21 @@ Open the `Tier Analysis` sheet created by setup. Select a tier in cell `B1`, the
 
 If the source sheet changes and you want to reload the selected level, use the `Tier Tools -> Refresh`. If you only want to rerun the calculations on the currently loaded data, use `Tier Tools -> Analyze Selected Level`.
 
+### Locking a Level
+
+To lock a level, open its tier sheet, select any cell in the level's three-column `Player | Opinion | Reliability` block, and use `Tier Tools -> Lock/Unlock Selected Level`. The full three-column block changes to a black background. Player names become white, while opinion and reliability text inherit their former background colors. This is a visual formatting convention and does not prevent editors from changing cells.
+
+Use the same menu action again to unlock the level and reverse the transformation. Fuck opinions and black-background reliability cells may require manual text-color adjustment after locking or unlocking because their original foreground color cannot be inferred consistently.
+
 The output panel includes the selected tier and level, total weighted opinions, weighted top vote and runner-up, mean, median, outliers, standard deviation, split totals, a `Place/Move` decision, a tier distribution table, and a reliability distribution table. When applicable, it also displays `Fuck` opinion percentage and related verdict handling.
 
 ### Tier Flag Scan
 
 Use `Tier Tools -> Scan Tier Flags` to scan a full tier sheet at once. If you run it from a tier sheet, that sheet is scanned. If you run it from `Tier Analysis` (or anywhere else), the tier selected in `B1` is scanned.
 
-The scan writes to a `Tier Flags` sheet and only lists levels that might require attention. Levels with `0` opinions are ignored. Current flags are: low opinion count, lock alert, red or green book alert (when the analyzer's full split distribution leans away from the current tier by at least `1.5` weighted opinions), move alert, and placement alert. If the analyzer's split thresholds are met, the scan reports movement instead of book status.
+The scan writes to a `Tier Flags` sheet and only lists levels that might require attention. Established tiers ignore levels with `0` opinions and use low opinion count, lock alert, red or green book alert (when the analyzer's full split distribution leans away from the current tier by at least `1.5` weighted opinions), and move alert. If the analyzer's split thresholds are met, the scan reports movement instead of book status.
+
+Pending scans use a separate flag priority: placement alert; `requires natural opinion to place` when the latest counted opinion is placeable and its reliability text contains `AREDL`, `UDL`, `External`, `Extrapolated`, or `GDDL` (for example, `Somewhat (GDDL op)`); no opinions; high opinion count at `20` or more raw opinions; an exact `+2.75` near-placement split; `close to placement` for splits of `+2` or more; low reliability when no counted opinion has green or blue reliability; and low opinion count below `3`. The natural-opinion and split flags display the current split in the Difference column. Only the highest-priority applicable flag is shown, while level rows retain their normal alphabetical order.
 
 ## Updating
 
