@@ -201,10 +201,11 @@ function extractLevelFlagData_(header, vals, bgs, fcs, lastCol) {
   const outVals = [];
   const outBgs = [];
   const outFcs = [];
+  const sourceRows = [];
   const startIdx = header.col - 1;
 
   if (startIdx + 2 >= lastCol) {
-    return { vals: outVals, bgs: outBgs, fcs: outFcs };
+    return { vals: outVals, bgs: outBgs, fcs: outFcs, sourceRows };
   }
 
   for (let r = 0; r < vals.length; r++) {
@@ -216,6 +217,8 @@ function extractLevelFlagData_(header, vals, bgs, fcs, lastCol) {
 
     if (isBlankFlagOpinionRow_(row)) continue;
 
+    // The source matrices start at sheet row 2; retain gaps for source highlighting.
+    sourceRows.push(r + 2);
     outVals.push(row);
     outBgs.push([
       bgs[r][startIdx],
@@ -229,7 +232,7 @@ function extractLevelFlagData_(header, vals, bgs, fcs, lastCol) {
     ]);
   }
 
-  return { vals: outVals, bgs: outBgs, fcs: outFcs };
+  return { vals: outVals, bgs: outBgs, fcs: outFcs, sourceRows };
 }
 
 function isBlankFlagOpinionRow_(row) {

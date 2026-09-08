@@ -1,5 +1,13 @@
 // functions related to color configurations and reading cells with color values
 
+// Validate opinion fills independently of reliability or placement eligibility.
+function isRecognizedOpinionColor_(color) {
+  const fill = hex_(color);
+  if (fill === "#000000" || difficultyColorNames[fill]) return true;
+  const pair = splitPairs[fill];
+  return !!pair && pair.length === 2 && pair.every(part => !!difficultyColorNames[hex_(part)]);
+}
+
 // maps difficulty color to tier name
 function hex_(color) {
   if (color == null) return "";

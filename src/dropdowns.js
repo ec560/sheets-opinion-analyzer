@@ -40,6 +40,7 @@ function onOpen() {
     .addItem("Lock/Unlock Selected Level", "toggleSelectedLevelLock")
     .addSeparator()
     .addItem("Scan Tier Flags", "scanSelectedTierFlags")
+    .addItem("Toggle Opinion Validation", "toggleTierOpinionValidation")
     .addToUi();
   refreshTierDropdown_();
 }
