@@ -479,18 +479,15 @@ function formatWeightedDistribution_(
     1
   );
   const dataRange = tool.getRange(firstDataRow, startCol, names.length, OUTPUT_WIDTH);
-  const formulaRange = tool.getRange(firstDataRow, startCol + 3, names.length, 1);
   const canBatch =
     typeof dataRange.setBackgrounds === "function" &&
     typeof dataRange.setFontColors === "function" &&
-    typeof dataRange.setFontWeights === "function" &&
-    typeof formulaRange.setFormulasR1C1 === "function";
+    typeof dataRange.setFontWeights === "function";
 
   if (canBatch) {
     const backgrounds = [];
     const fontColors = [];
     const fontWeights = [];
-    const formulas = [];
 
     for (const name of names) {
       const weight = weightsByName[name] || 0;
@@ -501,17 +498,22 @@ function formatWeightedDistribution_(
         ? [tierTextColor_(name), "#000000", "#000000", "#000000"]
         : ["#9e9e9e", "#9e9e9e", "#9e9e9e", "#9e9e9e"]);
       fontWeights.push(["bold", "normal", "normal", "normal"]);
-      formulas.push([isPositive
-        ? `=SPARKLINE({(RC[-1]/MAX(R${firstDataRow}C[-1]:R${lastDataRow}C[-1]))*${confidenceScale},1},` +
-          `{"charttype","bar";"color1","${color}";"color2","white";"max",1})`
-        : ""]);
     }
 
     dataRange
       .setBackgrounds(backgrounds)
       .setFontColors(fontColors)
       .setFontWeights(fontWeights);
-    formulaRange.setFormulasR1C1(formulas);
+
+    for (let i = 0; i < names.length; i++) {
+      const name = names[i];
+      if ((weightsByName[name] || 0) <= 0) continue;
+      const color = colorsByName[name] || "#999999";
+      tool.getRange(firstDataRow + i, startCol + 3).setFormulaR1C1(
+        `=SPARKLINE({(RC[-1]/MAX(R${firstDataRow}C[-1]:R${lastDataRow}C[-1]))*${confidenceScale},1},` +
+        `{"charttype","bar";"color1","${color}";"color2","white";"max",1})`
+      );
+    }
     return firstDataRow;
   }
 
