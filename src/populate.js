@@ -10,6 +10,34 @@ function safeCellValue_(v) {
   return v;
 }
 
+function getLevelLastRow_(tierSheet, startCol, numCols) {
+  const sheetLastRow = tierSheet.getLastRow();
+  if (sheetLastRow <= 1) return sheetLastRow;
+  if (
+    typeof tierSheet.getMaxRows !== "function" ||
+    !SpreadsheetApp.Direction ||
+    !SpreadsheetApp.Direction.UP
+  ) {
+    return sheetLastRow;
+  }
+
+  const maxRows = tierSheet.getMaxRows();
+  if (sheetLastRow >= maxRows) return sheetLastRow;
+
+  // The row below the sheet-wide last value is guaranteed to be empty. Starting
+  // there lets getNextDataCell find each selected column's actual final value.
+  const searchRow = sheetLastRow + 1;
+  let levelLastRow = 1;
+  for (let offset = 0; offset < numCols; offset++) {
+    const searchCell = tierSheet.getRange(searchRow, startCol + offset);
+    if (typeof searchCell.getNextDataCell !== "function") return sheetLastRow;
+    const lastCell = searchCell.getNextDataCell(SpreadsheetApp.Direction.UP);
+    if (!lastCell || typeof lastCell.getRow !== "function") return sheetLastRow;
+    levelLastRow = Math.max(levelLastRow, lastCell.getRow());
+  }
+  return Math.min(levelLastRow, sheetLastRow);
+}
+
 function populateSelectedLevel() {
   const ss = SpreadsheetApp.getActive();
   const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
@@ -47,7 +75,7 @@ function populateSelectedLevel() {
 
   const startCol = header.col;
   const numCols = 3; // player/opinion/reliability
-  const lastRow = tierSheet.getLastRow();
+  const lastRow = getLevelLastRow_(tierSheet, startCol, numCols);
   const numRows = Math.max(0, lastRow - 1);
 
   if (numRows === 0) {
