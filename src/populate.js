@@ -119,7 +119,12 @@ function populateSelectedLevel(options) {
   dest.setFontColors(outFcs);
 
   try {
-    return analyzeSelectedLevel({ outputAlreadyCleared: true }) !== false;
+    return analyzeSelectedLevel({
+      outputAlreadyCleared: true,
+      values: outVals,
+      backgrounds: outBgs,
+      fontColors: outFcs
+    }) !== false;
   } catch (e) {
     setAnalysisStatusMessage_(tool, "Failed to analyze opinions", "#fce8e6");
     return false;

@@ -38,17 +38,36 @@ function analyzeSelectedLevel(options) {
     return false;
   }
 
-  const lastRow = tool.getLastRow();
-  if (lastRow < DATA_START_ROW) {
-    SpreadsheetApp.getUi().alert("No opinions pasted yet. Pick the level dropdown again.");
-    return;
-  }
+  const preparedValues = options && options.values;
+  const preparedBackgrounds = options && options.backgrounds;
+  const preparedFontColors = options && options.fontColors;
+  const hasPreparedData =
+    Array.isArray(preparedValues) &&
+    Array.isArray(preparedBackgrounds) &&
+    Array.isArray(preparedFontColors) &&
+    preparedValues.length === preparedBackgrounds.length &&
+    preparedValues.length === preparedFontColors.length;
 
-  const numRows = lastRow - (DATA_START_ROW - 1);
-  const rng = tool.getRange(DATA_START_ROW, 1, numRows, 3);
-  const vals = rng.getValues();
-  const bgs = rng.getBackgrounds();
-  const fcs = rng.getFontColors();
+  let vals;
+  let bgs;
+  let fcs;
+  if (hasPreparedData) {
+    vals = preparedValues;
+    bgs = preparedBackgrounds;
+    fcs = preparedFontColors;
+  } else {
+    const lastRow = tool.getLastRow();
+    if (lastRow < DATA_START_ROW) {
+      SpreadsheetApp.getUi().alert("No opinions pasted yet. Pick the level dropdown again.");
+      return;
+    }
+
+    const numRows = lastRow - (DATA_START_ROW - 1);
+    const rng = tool.getRange(DATA_START_ROW, 1, numRows, 3);
+    vals = rng.getValues();
+    bgs = rng.getBackgrounds();
+    fcs = rng.getFontColors();
+  }
 
   const analysis = calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs);
   if (analysis.rawCount === 0) {
