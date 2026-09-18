@@ -180,12 +180,6 @@ function analyzeSelectedLevel(options) {
   const sdRow = out.findIndex(r => r[0] === "Standard Deviation");
   if (sdRow >= 0) tool.getRange(startRow + sdRow, startCol + 1).setNumberFormat("0.00").setHorizontalAlignment("left");
 
-  const outRow = out.findIndex(r => r[0] === "Outlier %");
-  if (outRow >= 0) {
-    tool.getRange(startRow + outRow, startCol + 1).setNumberFormat("0.0%").setHorizontalAlignment("left");
-    tool.getRange(startRow + outRow + 1, startCol + 3).setHorizontalAlignment("right");
-  }
-
   tool.getRange(startRow + 9, startCol + 2, Math.max(0, out.length - 9), 1).setNumberFormat("0.0%");
 
   formatAnalysisOutput_(
