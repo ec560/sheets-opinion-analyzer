@@ -25,7 +25,7 @@ function onEdit(e) {
   }
 
   if (a1 === LEVEL_CELL) {
-    populateSelectedLevel();
+    populateSelectedLevel({ skipTierDropdownRefresh: true });
   }
 }
 

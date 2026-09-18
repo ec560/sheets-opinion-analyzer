@@ -38,10 +38,10 @@ function getLevelLastRow_(tierSheet, startCol, numCols) {
   return Math.min(levelLastRow, sheetLastRow);
 }
 
-function populateSelectedLevel() {
+function populateSelectedLevel(options) {
   const ss = SpreadsheetApp.getActive();
   const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
-  refreshTierDropdown_();
+  if (!options || !options.skipTierDropdownRefresh) refreshTierDropdown_();
 
   if (typeof loadTierConfiguration_ === "function") {
     const configResult = loadTierConfiguration_();
