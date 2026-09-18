@@ -515,8 +515,7 @@ function setAnalysisStatusMessage_(tool, message, bg) {
   const r0 = OUTPUT_START_ROW;
   const c0 = OUTPUT_COL;
 
-  tool.getRange(r0, c0, 1, OUTPUT_WIDTH).breakApart();
-  tool.getRange(r0, c0, tool.getMaxRows(), OUTPUT_WIDTH).clearContent();
+  clearAnalysisOutput_(tool, false);
 
   tool.getRange(r0, c0, 1, OUTPUT_WIDTH)
     .setValues([[message, "", "", ""]])
@@ -525,6 +524,32 @@ function setAnalysisStatusMessage_(tool, message, bg) {
     .setFontFamily("Mukta")
     .setFontWeight("bold")
     .setHorizontalAlignment("center");
+}
+
+function clearAnalysisOutput_(tool, resetFormat) {
+  const r0 = OUTPUT_START_ROW;
+  let lastRow = r0;
+  const bottomCell = tool.getRange(tool.getMaxRows(), OUTPUT_COL);
+
+  if (
+    typeof bottomCell.getNextDataCell === "function" &&
+    SpreadsheetApp.Direction &&
+    SpreadsheetApp.Direction.UP
+  ) {
+    lastRow = Math.max(r0, bottomCell.getNextDataCell(SpreadsheetApp.Direction.UP).getRow());
+  } else {
+    // Compatibility fallback for local mocks and older callers.
+    lastRow = Math.max(r0, tool.getLastRow());
+  }
+
+  const output = tool.getRange(r0, OUTPUT_COL, lastRow - r0 + 1, OUTPUT_WIDTH);
+  output.breakApart().clearContent();
+  if (resetFormat) {
+    if (typeof output.clearFormat === "function") output.clearFormat();
+    if (typeof output.clearNote === "function") output.clearNote();
+    if (typeof output.setFontFamily === "function") output.setFontFamily("Mukta");
+    if (typeof output.setFontSize === "function") output.setFontSize(10);
+  }
 }
 
 function renderAnalysisStatus_(tool) {
@@ -536,9 +561,6 @@ function renderAnalysisStatus_(tool) {
   if (firstLabel === "Tier sheet") {
     return;
   }
-
-  tool.getRange(r0, c0, tool.getMaxRows(), OUTPUT_WIDTH)
-    .clearContent();
 
   const tierName = String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim();
   const levelName = String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim();

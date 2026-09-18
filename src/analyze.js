@@ -1,5 +1,5 @@
 // Main analysis function that reads opinions, applies weights, calculates stats, and outputs results
-function analyzeSelectedLevel() {
+function analyzeSelectedLevel(options) {
   const ss = SpreadsheetApp.getActive();
   const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
 
@@ -13,7 +13,19 @@ function analyzeSelectedLevel() {
     }
   }
 
-  tool.getRange(OUTPUT_START_ROW, OUTPUT_COL, tool.getMaxRows(), OUTPUT_WIDTH).clearContent().breakApart();
+  if (!options || !options.outputAlreadyCleared) {
+    if (typeof clearAnalysisOutput_ === "function") {
+      clearAnalysisOutput_(tool, true);
+    } else {
+      const lastRow = Math.max(OUTPUT_START_ROW, tool.getLastRow());
+      tool.getRange(
+        OUTPUT_START_ROW,
+        OUTPUT_COL,
+        lastRow - OUTPUT_START_ROW + 1,
+        OUTPUT_WIDTH
+      ).clearContent().breakApart();
+    }
+  }
 
   const tierName = tool.getRange(TIER_CELL).getDisplayValue().trim();
   const levelName = tool.getRange(LEVEL_CELL).getDisplayValue().trim();

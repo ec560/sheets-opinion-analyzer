@@ -31,7 +31,6 @@ function populateSelectedLevel() {
   }
 
   clearAnalysisArea_();
-  setAnalysisStatusMessage_(tool, "Loading..", "#e8f0fe");
 
   const tierSheet = ss.getSheetByName(tierName);
   if (!tierSheet) {
@@ -92,7 +91,7 @@ function populateSelectedLevel() {
   dest.setFontColors(outFcs);
 
   try {
-    return analyzeSelectedLevel() !== false;
+    return analyzeSelectedLevel({ outputAlreadyCleared: true }) !== false;
   } catch (e) {
     setAnalysisStatusMessage_(tool, "Failed to analyze opinions", "#fce8e6");
     return false;

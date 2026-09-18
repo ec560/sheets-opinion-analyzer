@@ -25,7 +25,6 @@ function onEdit(e) {
   }
 
   if (a1 === LEVEL_CELL) {
-    clearAnalysisArea_();
     populateSelectedLevel();
   }
 }
@@ -178,11 +177,15 @@ function headerGroupHasData_(bodyValues, startCol) {
 // clear A:C and output area
 function clearAnalysisArea_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(ANALYSIS_SHEET_NAME);
-  const maxRows = sh.getMaxRows();
-  const height = maxRows - (DATA_START_ROW - 1);
+  const lastRow = sh.getLastRow();
+  const height = Math.max(0, lastRow - DATA_START_ROW + 1);
   if (height > 0) {
-    sh.getRange(DATA_START_ROW, 1, height, 3).clearContent().clearFormat().clearNote();
+    sh.getRange(DATA_START_ROW, 1, height, 3)
+      .clearContent()
+      .clearFormat()
+      .clearNote()
+      .setFontFamily("Mukta")
+      .setFontSize(10);
   }
-  sh.getRange(OUTPUT_START_ROW, OUTPUT_COL, sh.getMaxRows(), OUTPUT_WIDTH).clearContent().clearFormat().clearNote();
-  formatAnalysisSheetLayout_(sh);
+  clearAnalysisOutput_(sh, true);
 }
