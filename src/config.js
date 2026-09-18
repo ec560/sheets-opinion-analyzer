@@ -3,7 +3,7 @@
 const ANALYSIS_SHEET_NAME = "Tier Analysis";
 const FLAG_SCAN_SHEET_NAME = "Tier Flags";
 const TIER_CONFIG_SHEET_NAME = "Tier Configuration";
-const VERSION = "v1.11.0";
+const VERSION = "v1.12.0";
 const TIER_CELL = "B1";
 const LEVEL_CELL = "B2";
 const DATA_START_ROW = 4;                      // where A:C gets populated
@@ -26,6 +26,8 @@ const PENDING_SCAN_LOW_OPINION_MAX_RAW_COUNT = 2;
 const PENDING_SCAN_NEAR_PLACEMENT_MARGIN = 2.75;
 const PENDING_SCAN_STRONG_SPLIT_MARGIN = 2;
 const COUNTED_PLAYER_HIGHLIGHT = "#e6f4ea";
+const DUPLICATE_PLAYER_HIGHLIGHT = "#ff0000";
+const PRE_UPDATE_PLAYER_HIGHLIGHT = "#b4a7d6";
 
 function isAnalyzerUtilitySheetName_(name) {
   return name === ANALYSIS_SHEET_NAME ||

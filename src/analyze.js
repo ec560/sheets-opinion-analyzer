@@ -40,7 +40,7 @@ function analyzeSelectedLevel() {
 
   const analysis = calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs);
   if (analysis.rawCount === 0) {
-    applyCountedPlayerHighlights_(tool, DATA_START_ROW, bgs, analysis.countedRowFlags);
+    applyCountedPlayerHighlights_(tool, DATA_START_ROW, bgs, analysis.countedRowFlags, vals);
     setAnalysisStatusMessage_(tool, "No usable opinions", "#fce8e6");
     return false;
   }
@@ -190,7 +190,7 @@ function analyzeSelectedLevel() {
     reliabilityDistribution
   );
 
-  applyCountedPlayerHighlights_(tool, DATA_START_ROW, bgs, countedRowFlags);
+  applyCountedPlayerHighlights_(tool, DATA_START_ROW, bgs, countedRowFlags, vals);
   return true;
 }
 

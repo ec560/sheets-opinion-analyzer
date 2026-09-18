@@ -17,14 +17,43 @@ function applyTierSheetColor_(tool, r0, c0, outRowCount) {
     .setFontWeight("bold");
 }
 
-function applyCountedPlayerHighlights_(tool, startRow, sourceBackgrounds, countedRowFlags) {
+function applyCountedPlayerHighlights_(tool, startRow, sourceBackgrounds, countedRowFlags, sourceValues) {
   if (!sourceBackgrounds || sourceBackgrounds.length === 0) return;
 
+  const duplicateHighlights = buildDuplicatePlayerHighlights_(sourceValues || []);
   const fills = sourceBackgrounds.map((row, idx) => {
-    return [countedRowFlags && countedRowFlags[idx] ? COUNTED_PLAYER_HIGHLIGHT : "#ffffff"];
+    return [duplicateHighlights[idx] ||
+      (countedRowFlags && countedRowFlags[idx] ? COUNTED_PLAYER_HIGHLIGHT : "#ffffff")];
   });
 
   tool.getRange(startRow, 1, fills.length, 1).setBackgrounds(fills);
+}
+
+function buildDuplicatePlayerHighlights_(values) {
+  const highlights = new Array(values.length).fill("");
+  const players = new Map();
+
+  values.forEach((row, index) => {
+    const player = String(row[0] ?? "").trim().toLowerCase();
+    if (!player) return;
+    if (!players.has(player)) players.set(player, { current: [], preUpdate: [] });
+    const reliabilityText = String(row[2] ?? "");
+    const isPreUpdate = /\bpre[\s\-\u2010-\u2015]*update\b/i.test(reliabilityText);
+    const group = players.get(player);
+    (isPreUpdate ? group.preUpdate : group.current).push(index);
+  });
+
+  for (const group of players.values()) {
+    const hasBothVersions = group.current.length > 0 && group.preUpdate.length > 0;
+    for (const rows of [group.current, group.preUpdate]) {
+      // Same-version duplicates take priority over a pre-update/current pair.
+      const color = rows.length > 1
+        ? DUPLICATE_PLAYER_HIGHLIGHT
+        : hasBothVersions ? PRE_UPDATE_PLAYER_HIGHLIGHT : "";
+      rows.forEach(index => highlights[index] = color);
+    }
+  }
+  return highlights;
 }
 
 function trimFixed_(value, digits) {
