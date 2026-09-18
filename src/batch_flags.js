@@ -489,8 +489,7 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
 
   sh.getRange(1, 1, 1, colCount)
     .setBackground("#e8f0fe")
-    .setFontWeight("bold")
-    .setBorder(true, true, true, true, false, false, "#dadce0", SpreadsheetApp.BorderStyle.SOLID);
+    .setFontWeight("bold");
 
   sh.getRange(1, 3)
     .setFontColor("#5f6368")
@@ -506,8 +505,7 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
 
   sh.getRange(2, 1, 1, colCount)
     .setBackground("#eeeeee")
-    .setFontWeight("bold")
-    .setBorder(true, false, true, false, false, false, "#d6d9dc", SpreadsheetApp.BorderStyle.SOLID);
+    .setFontWeight("bold");
   sh.setColumnWidth(1, 150);
   sh.setColumnWidth(4, 225);
   sh.setColumnWidth(5, 160);
@@ -519,39 +517,49 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
   sh.getRange(3, 3, rowCount - 2, 1).setNumberFormat("0");
   sh.getRange(3, 2, rowCount - 2, 2).setHorizontalAlignment("right");
 
+  const backgrounds = [];
+  const fontColors = [];
+  const fontWeights = [];
+  const fontStyles = [];
+
   for (let i = 2; i < rowCount; i++) {
-    const rowNum = i + 1;
     const row = rows[i];
     const flagRow = flagRows && flagRows.length > (i - 2) ? flagRows[i - 2] : null;
     const flagStyle = tierFlagStyle_(flagRow && flagRow.styleKey);
+    const rowBackgrounds = new Array(colCount).fill("#ffffff");
+    const rowFontColors = new Array(colCount).fill("#202124");
+    const rowFontWeights = new Array(colCount).fill("normal");
+    const rowFontStyles = new Array(colCount).fill("normal");
 
     if (String(row[0] || "") === "No flagged levels") {
-      sh.getRange(rowNum, 1, 1, colCount)
-        .setBackground("#f5f5f5")
-        .setFontColor("#5f6368")
-        .setFontStyle("italic");
-      continue;
+      rowBackgrounds.fill("#f5f5f5");
+      rowFontColors.fill("#5f6368");
+      rowFontStyles.fill("italic");
+    } else {
+      rowFontWeights[0] = flagStyle.fontWeight;
+      rowBackgrounds[3] = flagStyle.background;
+      rowFontColors[3] = flagStyle.text;
+      rowFontWeights[3] = flagStyle.fontWeight;
+
+      if (flagStyle.styleDifference) {
+        rowBackgrounds[6] = flagStyle.background;
+        rowFontColors[6] = flagStyle.text;
+        rowFontWeights[6] = flagStyle.fontWeight;
+      }
     }
 
-    const differenceCell = sh.getRange(rowNum, 7);
-    sh.getRange(rowNum, 1, 1, colCount)
-      .setBorder(false, false, true, false, false, false, "#eeeeee", SpreadsheetApp.BorderStyle.SOLID);
-
-    sh.getRange(rowNum, 1).setFontWeight(flagStyle.fontWeight);
-
-    const flagCell = sh.getRange(rowNum, 4);
-    flagCell
-      .setBackground(flagStyle.background)
-      .setFontColor(flagStyle.text)
-      .setFontWeight(flagStyle.fontWeight);
-
-    if (flagStyle.styleDifference) {
-      differenceCell
-        .setBackground(flagStyle.background)
-        .setFontColor(flagStyle.text)
-        .setFontWeight(flagStyle.fontWeight);
-    }
+    backgrounds.push(rowBackgrounds);
+    fontColors.push(rowFontColors);
+    fontWeights.push(rowFontWeights);
+    fontStyles.push(rowFontStyles);
   }
+
+  const resultRange = sh.getRange(3, 1, rowCount - 2, colCount);
+  resultRange
+    .setBackgrounds(backgrounds)
+    .setFontColors(fontColors)
+    .setFontWeights(fontWeights)
+    .setFontStyles(fontStyles);
 }
 
 function styleTierFlagCell_(sh, row, col, tierName) {
