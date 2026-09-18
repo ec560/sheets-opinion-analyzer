@@ -157,7 +157,6 @@ function getFlagScanTierName_(ss, tool) {
 }
 
 function buildTierFlagScan_(tierName, tierSheet) {
-  const headers = getLevelHeaders_(tierSheet);
   const lastRow = tierSheet.getLastRow();
   const lastCol = tierSheet.getLastColumn();
   const numRows = Math.max(0, lastRow - 1);
@@ -171,6 +170,7 @@ function buildTierFlagScan_(tierName, tierSheet) {
     bgs = sourceRange.getBackgrounds();
     fcs = sourceRange.getFontColors();
   }
+  const headers = getLevelHeaders_(tierSheet, vals);
 
   const rows = [];
   headers.forEach(header => {

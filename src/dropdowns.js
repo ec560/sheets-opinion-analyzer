@@ -94,7 +94,7 @@ function refreshLevelDropdown_() {
 }
 
 // get level headers from the tier sheet (each level is a header on row 1, occupying 3 columns)
-function getLevelHeaders_(tierSheet) {
+function getLevelHeaders_(tierSheet, bodyValues) {
   // level names are headers on row 1
   // each level occupies 3 columns: [player, opinion, reliability].
   const headerRow = 1;
@@ -127,14 +127,21 @@ function getLevelHeaders_(tierSheet) {
 
   let levelHeaders = headers;
   if (canReadMergedRanges && typeof tierSheet.getLastRow === "function") {
-    const bodyRowCount = Math.max(0, tierSheet.getLastRow() - headerRow);
-    const bodyValues = bodyRowCount > 0
-      ? tierSheet.getRange(headerRow + 1, 1, bodyRowCount, lastCol).getDisplayValues()
-      : [];
-
-    levelHeaders = headers.filter((header, index) => {
-      return !isAlphabeticalSectionHeader_(headers, index, bodyValues);
+    const sectionHeaderIndexes = new Set();
+    headers.forEach((header, index) => {
+      if (isAlphabeticalSectionHeader_(headers, index)) sectionHeaderIndexes.add(index);
     });
+
+    if (sectionHeaderIndexes.size > 0) {
+      const bodyRowCount = bodyValues
+        ? bodyValues.length
+        : Math.max(0, tierSheet.getLastRow() - headerRow);
+      levelHeaders = headers.filter((header, index) => {
+        if (!sectionHeaderIndexes.has(index)) return true;
+        if (bodyValues) return headerGroupHasData_(bodyValues, header.col);
+        return headerRangeHasData_(tierSheet, bodyRowCount, header.col);
+      });
+    }
   }
 
   // Remove duplicates in case merged headers repeat
@@ -148,12 +155,11 @@ function getLevelHeaders_(tierSheet) {
   return out;
 }
 
-function isAlphabeticalSectionHeader_(headers, index, bodyValues) {
+function isAlphabeticalSectionHeader_(headers, index) {
   const current = headers[index];
   const next = headers[index + 1];
   const afterNext = headers[index + 2];
   if (!current || !next || !afterNext) return false;
-  if (headerGroupHasData_(bodyValues, current.col)) return false;
 
   const currentName = current.name.toLocaleLowerCase();
   const nextName = next.name.toLocaleLowerCase();
@@ -162,6 +168,14 @@ function isAlphabeticalSectionHeader_(headers, index, bodyValues) {
   const ascendingRunResumes = afterNextName.localeCompare(nextName) >= 0;
 
   return resetsAfterCurrent && ascendingRunResumes;
+}
+
+function headerRangeHasData_(tierSheet, bodyRowCount, startCol) {
+  if (bodyRowCount <= 0) return false;
+  const values = tierSheet
+    .getRange(2, startCol, bodyRowCount, 3)
+    .getDisplayValues();
+  return headerGroupHasData_(values, 1);
 }
 
 function headerGroupHasData_(bodyValues, startCol) {

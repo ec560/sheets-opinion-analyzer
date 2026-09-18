@@ -189,6 +189,7 @@ function analyzeSelectedLevel(options) {
     fuckpct,
     allWeight,
     currentTier,
+    canMove,
     verdictTier,
     verdictTierName,
     verdictBaseName,
@@ -199,7 +200,8 @@ function analyzeSelectedLevel(options) {
     passesSplitPct,
     splitThreshold,
     moveFailureReason,
-    reliabilityDistribution
+    reliabilityDistribution,
+    out.map(row => row[0])
   );
 
   applyCountedPlayerHighlights_(tool, DATA_START_ROW, bgs, countedRowFlags, vals);

@@ -1,17 +1,12 @@
-function applyTierSheetColor_(tool, r0, c0, outRowCount) {
-  const labels = tool.getRange(r0, c0, outRowCount, 1).getDisplayValues().flat();
-  const tierSheetRowOff = labels.findIndex(v => String(v).trim() === "Tier sheet");
-  if (tierSheetRowOff < 0) return;
-
-  const r = r0 + tierSheetRowOff;
-  const tierName = String(tool.getRange(r, c0 + 1).getDisplayValue()).trim(); // value cell
+function applyTierSheetColor_(tool, row, valueCol, tierName) {
+  tierName = String(tierName || "").trim();
   if (!tierName) return;
 
   const nameToColor = buildTierNameToColor_();
   const hex = nameToColor[tierName];
   if (!hex) return; // if sheet name isn't a tier name, skip
 
-  tool.getRange(r, c0 + 1)
+  tool.getRange(row, valueCol)
     .setBackground(hex)
     .setFontColor(tierTextColor_(tierName))
     .setFontWeight("bold");
@@ -136,6 +131,7 @@ function formatAnalysisOutput_(
   fuckpct,
   allWeight,
   currentTier,
+  canMove,
   verdictTier,
   verdictTierName,
   verdictBaseName,
@@ -146,7 +142,8 @@ function formatAnalysisOutput_(
   passesSplitPct,
   splitThreshold,
   moveFailureReason,
-  reliabilityDistribution
+  reliabilityDistribution,
+  labels
 ) {
   const r0 = OUTPUT_START_ROW;
   const c0 = OUTPUT_COL;
@@ -170,13 +167,6 @@ function formatAnalysisOutput_(
     .setHorizontalAlignment("center")
     .setFontSize(11);
 
-  // Find key rows
-  const labels = tool.getRange(r0, c0, outRowCount, 1)
-    .getDisplayValues()
-    .flat();
-
-  applyTierSheetColor_(tool, r0, c0, outRowCount);
-
   const meetsRow = labels.findIndex(v => v === "Place/Move");
   const splitRow = labels.findIndex(v => v === "Split");
   const signalHeader = labels.findIndex(v => String(v).trim() === "Fuck % of all");
@@ -186,6 +176,8 @@ function formatAnalysisOutput_(
   // Header rows
   const tierRow = labels.findIndex(v => String(v).trim() === "Tier sheet");
   const levelRow = labels.findIndex(v => String(v).trim() === "Level");
+
+  if (tierRow >= 0) applyTierSheetColor_(tool, r0 + tierRow, c0 + 1, currentTier);
 
   // Tier Header formatting
   if (tierRow >= 0) {
@@ -281,7 +273,7 @@ function formatAnalysisOutput_(
   // Verdict emphasis
   if (meetsRow >= 0) {
     const r = r0 + meetsRow;
-    const val = tool.getRange(r, c0 + 1).getDisplayValue().toUpperCase();
+    const val = canMove ? "YES" : "NO";
     const msgRange = tool.getRange(r, c0 + 2, 1, 2);
     const msgCell = tool.getRange(r, c0 + 2);
 
@@ -478,6 +470,51 @@ function formatWeightedDistribution_(
     .setBackground("#eeeeee")
     .setFontWeight("bold");
 
+  if (names.length === 0) return firstDataRow;
+
+  const fullWidthAt = 45;
+  const minScale = 0.2;
+  const confidenceScale = Math.min(
+    minScale + (1 - minScale) * (totalWeightedOpinions / fullWidthAt),
+    1
+  );
+  const dataRange = tool.getRange(firstDataRow, startCol, names.length, OUTPUT_WIDTH);
+  const formulaRange = tool.getRange(firstDataRow, startCol + 3, names.length, 1);
+  const canBatch =
+    typeof dataRange.setBackgrounds === "function" &&
+    typeof dataRange.setFontColors === "function" &&
+    typeof dataRange.setFontWeights === "function" &&
+    typeof formulaRange.setFormulasR1C1 === "function";
+
+  if (canBatch) {
+    const backgrounds = [];
+    const fontColors = [];
+    const fontWeights = [];
+    const formulas = [];
+
+    for (const name of names) {
+      const weight = weightsByName[name] || 0;
+      const color = colorsByName[name] || "#999999";
+      const isPositive = weight > 0;
+      backgrounds.push([isPositive ? color : null, null, null, null]);
+      fontColors.push(isPositive
+        ? [tierTextColor_(name), "#000000", "#000000", "#000000"]
+        : ["#9e9e9e", "#9e9e9e", "#9e9e9e", "#9e9e9e"]);
+      fontWeights.push(["bold", "normal", "normal", "normal"]);
+      formulas.push([isPositive
+        ? `=SPARKLINE({(RC[-1]/MAX(R${firstDataRow}C[-1]:R${lastDataRow}C[-1]))*${confidenceScale},1},` +
+          `{"charttype","bar";"color1","${color}";"color2","white";"max",1})`
+        : ""]);
+    }
+
+    dataRange
+      .setBackgrounds(backgrounds)
+      .setFontColors(fontColors)
+      .setFontWeights(fontWeights);
+    formulaRange.setFormulasR1C1(formulas);
+    return firstDataRow;
+  }
+
   for (let i = 0; i < names.length; i++) {
     const row = firstDataRow + i;
     const name = names[i];
@@ -494,13 +531,6 @@ function formatWeightedDistribution_(
       .setBackground(color)
       .setFontWeight("bold")
       .setFontColor(tierTextColor_(name));
-
-    const fullWidthAt = 45;
-    const minScale = 0.2;
-    const confidenceScale = Math.min(
-      minScale + (1 - minScale) * (totalWeightedOpinions / fullWidthAt),
-      1
-    );
 
     tool.getRange(row, startCol + 3).setFormulaR1C1(
       `=SPARKLINE({(RC[-1]/MAX(R${firstDataRow}C[-1]:R${lastDataRow}C[-1]))*${confidenceScale},1},` +
