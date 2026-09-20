@@ -53,6 +53,9 @@ function setSelectedLevelLockState_(shouldLock) {
 
   const segments = getLevelLockSegments_(target.sheet, target.startCol, target.sheet.getMaxRows());
   const failedSegments = applyLevelLockSegments_(segments, shouldLock);
+  if (shouldLock && isFuckTierSheet_(target.sheet)) {
+    target.sheet.getRange(1, target.startCol).setBackground(LEVEL_LOCK_BLACK_MARKER);
+  }
   SpreadsheetApp.flush();
 
   if (failedSegments.length > 0) {
@@ -94,7 +97,14 @@ function getSelectedLevelForLocking_(ss) {
 }
 
 function isLevelLocked_(sheet, startCol) {
-  return hex_(sheet.getRange(1, startCol).getBackground()) === LEVEL_LOCK_BACKGROUND;
+  const background = hex_(sheet.getRange(1, startCol).getBackground());
+  if (background === LEVEL_LOCK_BLACK_MARKER) return true;
+  if (background !== LEVEL_LOCK_BACKGROUND) return false;
+  return !isFuckTierSheet_(sheet);
+}
+
+function isFuckTierSheet_(sheet) {
+  return String(sheet.getName() || "").toLowerCase() === "fuck";
 }
 
 function getLevelLockSegments_(sheet, startCol, maxRows) {
@@ -167,16 +177,19 @@ function applyLevelLockSegments_(segments, shouldLock) {
 function lockLevelRange_(range) {
   const originalBackgrounds = normalizeColorMatrix_(range.getBackgrounds());
   const originalFontColors = normalizeColorMatrix_(range.getFontColors());
-  const lockedBackgrounds = originalBackgrounds.map(row => {
+  const firstRow = typeof range.getRow === "function" ? range.getRow() : 1;
+  const lockedBackgrounds = originalBackgrounds.map((row, rowIndex) => {
     return row.map((background, colIndex) => {
-      return colIndex > 0 && background === LEVEL_LOCK_BACKGROUND
+      const isHeaderCell = firstRow + rowIndex === 1 && colIndex === 0;
+      return (colIndex > 0 || isHeaderCell) && background === LEVEL_LOCK_BACKGROUND
         ? LEVEL_LOCK_BLACK_MARKER
         : LEVEL_LOCK_BACKGROUND;
     });
   });
   const lockedFontColors = originalBackgrounds.map((row, rowIndex) => {
     return row.map((background, colIndex) => {
-      return colIndex > 0 && background === LEVEL_LOCK_BACKGROUND
+      const isHeaderCell = firstRow + rowIndex === 1 && colIndex === 0;
+      return (colIndex > 0 || isHeaderCell) && background === LEVEL_LOCK_BACKGROUND
         ? originalFontColors[rowIndex][colIndex]
         : background;
     });
@@ -206,12 +219,22 @@ function unlockLevelRange_(range) {
 
 function lockMergedLevelRange_(range) {
   const originalBackground = hex_(range.getBackground());
+  if (originalBackground === LEVEL_LOCK_BACKGROUND) {
+    range.setBackground(LEVEL_LOCK_BLACK_MARKER);
+    return;
+  }
   range.setFontColor(originalBackground);
   range.setBackground(LEVEL_LOCK_BACKGROUND);
 }
 
 function unlockMergedLevelRange_(range) {
   const hasVisibleValue = String(range.getDisplayValue() || "").trim() !== "";
+  const lockedBackground = hex_(range.getBackground());
+  if (lockedBackground === LEVEL_LOCK_BLACK_MARKER) {
+    range.setBackground(hasVisibleValue ? LEVEL_LOCK_BACKGROUND : LEVEL_UNLOCK_BACKGROUND);
+    if (!hasVisibleValue) range.setFontColor(LEVEL_UNLOCK_FONT_COLOR);
+    return;
+  }
   const restoredBackground = hasVisibleValue
     ? hex_(range.getFontColor())
     : LEVEL_UNLOCK_BACKGROUND;
