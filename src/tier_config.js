@@ -153,6 +153,9 @@ function parseTierConfigList_(values, backgrounds, bottomValue, topValue, fontCo
     entries.push({ label, color, fontColor, sheetRow, isSplit: isTierSplitLabel_(label) });
     if (!isTierHexColor_(color)) errors.push("Row " + sheetRow + ": paste a cell with a solid fill color.");
     if (color === "#000000") errors.push("Row " + sheetRow + ": black is reserved by the analyzer.");
+    if (color === LEVEL_LOCK_BLACK_MARKER) {
+      errors.push("Row " + sheetRow + ": " + LEVEL_LOCK_BLACK_MARKER + " is reserved for locked black cells.");
+    }
   });
 
   const tierEntries = entries.filter(entry => !entry.isSplit);

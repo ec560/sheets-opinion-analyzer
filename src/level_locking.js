@@ -166,16 +166,42 @@ function applyLevelLockSegments_(segments, shouldLock) {
 
 function lockLevelRange_(range) {
   const originalBackgrounds = normalizeColorMatrix_(range.getBackgrounds());
-  range.setFontColors(originalBackgrounds);
-  range.setBackground(LEVEL_LOCK_BACKGROUND);
+  const originalFontColors = normalizeColorMatrix_(range.getFontColors());
+  const lockedBackgrounds = originalBackgrounds.map(row => {
+    return row.map((background, colIndex) => {
+      return colIndex > 0 && background === LEVEL_LOCK_BACKGROUND
+        ? LEVEL_LOCK_BLACK_MARKER
+        : LEVEL_LOCK_BACKGROUND;
+    });
+  });
+  const lockedFontColors = originalBackgrounds.map((row, rowIndex) => {
+    return row.map((background, colIndex) => {
+      return colIndex > 0 && background === LEVEL_LOCK_BACKGROUND
+        ? originalFontColors[rowIndex][colIndex]
+        : background;
+    });
+  });
+
+  range.setFontColors(lockedFontColors);
+  range.setBackgrounds(lockedBackgrounds);
 }
 
 function unlockLevelRange_(range) {
+  const lockedBackgrounds = normalizeColorMatrix_(range.getBackgrounds());
   const storedBackgrounds = normalizeColorMatrix_(range.getFontColors());
   const displayValues = range.getDisplayValues();
-  const restoredBackgrounds = buildUnlockedLevelBackgrounds_(storedBackgrounds, displayValues);
+  const restoredBackgrounds = buildUnlockedLevelBackgrounds_(
+    lockedBackgrounds,
+    storedBackgrounds,
+    displayValues
+  );
   range.setBackgrounds(restoredBackgrounds);
-  range.setFontColors(buildUnlockedLevelFontColors_(restoredBackgrounds));
+  range.setFontColors(buildUnlockedLevelFontColors_(
+    restoredBackgrounds,
+    lockedBackgrounds,
+    storedBackgrounds,
+    displayValues
+  ));
 }
 
 function lockMergedLevelRange_(range) {
@@ -197,18 +223,33 @@ function normalizeColorMatrix_(colors) {
   return colors.map(row => row.map(hex_));
 }
 
-function buildUnlockedLevelBackgrounds_(storedBackgrounds, displayValues) {
+function buildUnlockedLevelBackgrounds_(lockedBackgrounds, storedBackgrounds, displayValues) {
   return storedBackgrounds.map((row, rowIndex) => {
     return row.map((background, colIndex) => {
       const value = displayValues[rowIndex] && displayValues[rowIndex][colIndex];
-      return String(value || "").trim() === "" ? LEVEL_UNLOCK_BACKGROUND : background;
+      if (String(value || "").trim() === "") return LEVEL_UNLOCK_BACKGROUND;
+      return lockedBackgrounds[rowIndex][colIndex] === LEVEL_LOCK_BLACK_MARKER
+        ? LEVEL_LOCK_BACKGROUND
+        : background;
     });
   });
 }
 
-function buildUnlockedLevelFontColors_(backgrounds) {
+function buildUnlockedLevelFontColors_(
+  backgrounds,
+  lockedBackgrounds,
+  storedBackgrounds,
+  displayValues
+) {
   return backgrounds.map((row, rowIndex) => {
     return row.map((background, colIndex) => {
+      const value = displayValues[rowIndex] && displayValues[rowIndex][colIndex];
+      if (
+        String(value || "").trim() !== "" &&
+        lockedBackgrounds[rowIndex][colIndex] === LEVEL_LOCK_BLACK_MARKER
+      ) {
+        return storedBackgrounds[rowIndex][colIndex];
+      }
       if (rowIndex === 0 || colIndex === 1) {
         return configuredOpinionFontColor_(background, LEVEL_UNLOCK_FONT_COLOR);
       }

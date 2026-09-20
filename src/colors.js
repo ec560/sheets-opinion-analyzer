@@ -2,10 +2,15 @@
 
 // Validate opinion fills independently of reliability or placement eligibility.
 function isRecognizedOpinionColor_(color) {
-  const fill = hex_(color);
+  const fill = effectiveBackgroundColor_(color);
   if (fill === "#000000" || difficultyColorNames[fill]) return true;
   const pair = splitPairs[fill];
   return !!pair && pair.length === 2 && pair.every(part => !!difficultyColorNames[hex_(part)]);
+}
+
+function effectiveBackgroundColor_(color) {
+  const fill = hex_(color);
+  return fill === LEVEL_LOCK_BLACK_MARKER ? "#000000" : fill;
 }
 
 // maps difficulty color to tier name
@@ -33,7 +38,7 @@ function tierTextColor_(tierName) {
 }
 
 function configuredOpinionFontColor_(fillColor, fallbackFontColor) {
-  const fill = hex_(fillColor);
+  const fill = effectiveBackgroundColor_(fillColor);
   if (fill === "#000000") return hex_(fallbackFontColor) || "#000000";
   return opinionFontColorsByFill[fill] || hex_(fallbackFontColor) || "#000000";
 }

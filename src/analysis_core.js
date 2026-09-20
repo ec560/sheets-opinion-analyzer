@@ -29,8 +29,8 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
 
     if (!player && !opinionText && !relText) continue;
 
-    const opinionColor = hex_(bgs[r][1]);
-    const relColor = hex_(bgs[r][2]);
+    const opinionColor = effectiveBackgroundColor_(bgs[r][1]);
+    const relColor = effectiveBackgroundColor_(bgs[r][2]);
     const w = reliabilityFactors[relColor] ?? 0;
     const opinionFont = hex_(fcs[r][1]);
 
