@@ -431,7 +431,7 @@ function buildTierFlagRow_(analysis, flagSummary) {
       flagSummary.flags.join("; "),
       comparison.left.label + " / " + comparison.right.label,
       formatFlagNumber_(comparison.left.weight) + " | " + formatFlagNumber_(comparison.right.weight),
-      formatDifference_(flagSummary.differenceAlert)
+      flagSummary.differenceAlert ? formatComparisonDifference_(comparison) : ""
     ],
     styleKey: flagSummary.styleKey || "",
     priority: flagSummary.priority || 99,
@@ -593,4 +593,17 @@ function formatDifference_(alert) {
     formatFlagNumber_(alert.lean) +
     " " +
     alert.tier;
+}
+
+function formatComparisonDifference_(comparison) {
+  if (!comparison || !comparison.left || !comparison.right) return "";
+
+  const leftWeight = Number(comparison.left.weight) || 0;
+  const rightWeight = Number(comparison.right.weight) || 0;
+  const winner = leftWeight > rightWeight ? comparison.left : comparison.right;
+
+  return "+" +
+    formatFlagNumber_(Math.abs(leftWeight - rightWeight)) +
+    " " +
+    winner.label;
 }
