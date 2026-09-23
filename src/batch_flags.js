@@ -7,35 +7,42 @@ const TIER_FLAG_STYLES = {
     styleDifference: false
   },
   book: {
-    priority: 2,
+    priority: 3,
     background: "#f9ab00",
     text: "#3c2400",
     fontWeight: "bold",
     styleDifference: true
   },
+  experienced_book: {
+    priority: 4,
+    background: "#00ffff",
+    text: "#00363a",
+    fontWeight: "bold",
+    styleDifference: false
+  },
   lock: {
-    priority: 3,
+    priority: 2,
     background: "#d2e3fc",
     text: "#174ea6",
     fontWeight: "bold",
     styleDifference: false
   },
   needs_more: {
-    priority: 4,
+    priority: 5,
     background: "#fef7e0",
     text: "#7a4f01",
     fontWeight: "bold",
     styleDifference: true
   },
   low_unsettled: {
-    priority: 5,
+    priority: 6,
     background: "#fce8e6",
     text: "#b3261e",
     fontWeight: "bold",
     styleDifference: true
   },
   low_solid: {
-    priority: 6,
+    priority: 7,
     background: "#f1f3f4",
     text: "#5f6368",
     fontWeight: "normal",
@@ -103,6 +110,106 @@ function tierFlagStyle_(styleKey) {
   return TIER_FLAG_STYLES[styleKey] || TIER_FLAG_STYLES.neutral;
 }
 
+function normalizePlayerSheetName_(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function experiencedPlayerRosterError_(message) {
+  const error = new Error("Experienced player roster: " + message);
+  error.name = "ExperiencedPlayerRosterError";
+  return error;
+}
+
+function loadExperiencedPlayerNames_(configuration) {
+  const config = configuration || readExperiencedPlayerConfiguration_();
+  const spreadsheetId = String(config && config.spreadsheetId || "").trim();
+  if (!spreadsheetId) return null;
+
+  let rosterSpreadsheet;
+  try {
+    rosterSpreadsheet = SpreadsheetApp.openById(spreadsheetId);
+  } catch (error) {
+    return null;
+  }
+  if (!rosterSpreadsheet) return null;
+
+  const rosterTabName = String(config.rosterTabName || "").trim() ||
+    EXPERIENCED_PLAYER_DEFAULT_ROSTER_TAB;
+  let rosterSheet;
+  try {
+    rosterSheet = rosterSpreadsheet.getSheetByName(rosterTabName);
+  } catch (error) {
+    return null;
+  }
+  if (!rosterSheet) return null;
+
+  let header;
+  let values;
+  try {
+    header = rosterSheet.getRange("A1").getDisplayValue();
+    const lastRow = rosterSheet.getLastRow();
+    values = lastRow > 1
+      ? rosterSheet.getRange(2, 1, lastRow - 1, 1).getValues()
+      : [];
+  } catch (error) {
+    return null;
+  }
+
+  if (String(header || "").trim() !== "Sheet Name") {
+    throw experiencedPlayerRosterError_(
+      "cell A1 on \"" + rosterTabName + "\" must contain \"Sheet Name\"."
+    );
+  }
+
+  const experiencedPlayers = new Set();
+  values.forEach(row => {
+    const player = normalizePlayerSheetName_(row && row[0]);
+    if (!player) return;
+    if (experiencedPlayers.has(player)) {
+      throw experiencedPlayerRosterError_("duplicate sheet name \"" + player + "\".");
+    }
+    experiencedPlayers.add(player);
+  });
+  return experiencedPlayers;
+}
+
+function countExperiencedPlayersForLevel_(values, experiencedPlayers) {
+  const matched = new Set();
+  (values || []).forEach(row => {
+    const player = normalizePlayerSheetName_(row && row[0]);
+    if (player && experiencedPlayers.has(player)) matched.add(player);
+  });
+  return matched.size;
+}
+
+function countUniquePlayersForLevel_(values) {
+  const players = new Set();
+  (values || []).forEach(row => {
+    const player = normalizePlayerSheetName_(row && row[0]);
+    if (player) players.add(player);
+  });
+  return players.size;
+}
+
+function buildExperiencedPlayerBookshelfTag_(experiencedCount, sampleSize) {
+  const total = Number(sampleSize);
+  const experienced = Number(experiencedCount);
+  if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(experienced) || experienced < 0) {
+    return "";
+  }
+
+  const share = experienced / total;
+  const percentage = Math.round(share * 100);
+  const detail = experienced + "/" + total + ", " + percentage + "%";
+  if (share <= EXPERIENCED_PLAYER_LOW_SHARE_MAX) {
+    return "few experienced (" + detail + ")";
+  }
+  if (share >= EXPERIENCED_PLAYER_HIGH_SHARE_MIN) {
+    return "many experienced (" + detail + ")";
+  }
+  return "";
+}
+
 function scanSelectedTierFlags() {
   const ss = SpreadsheetApp.getActive();
   const ui = SpreadsheetApp.getUi();
@@ -128,7 +235,16 @@ function scanSelectedTierFlags() {
     return;
   }
 
-  const result = buildTierFlagScan_(tierName, tierSheet);
+  let result;
+  try {
+    result = buildTierFlagScan_(tierName, tierSheet);
+  } catch (error) {
+    if (error && error.name === "ExperiencedPlayerRosterError") {
+      ui.alert("Tier Flag Scan", error.message, ui.ButtonSet.OK);
+      return;
+    }
+    throw error;
+  }
   if (result.scanned === 0) {
     ui.alert("Tier Flag Scan", "No level headers found on \"" + tierName + "\".", ui.ButtonSet.OK);
     return;
@@ -171,10 +287,18 @@ function buildTierFlagScan_(tierName, tierSheet) {
     fcs = sourceRange.getFontColors();
   }
   const headers = getLevelHeaders_(tierSheet, vals);
+  const experiencedPlayerConfig = readExperiencedPlayerConfiguration_();
+  const experiencedPlayers = loadExperiencedPlayerNames_(experiencedPlayerConfig);
 
   const rows = [];
   headers.forEach(header => {
     const levelData = extractLevelFlagData_(header, vals, bgs, fcs, lastCol);
+    let bookshelfTag = "";
+    if (experiencedPlayers !== null) {
+      const experiencedCount = countExperiencedPlayersForLevel_(levelData.vals, experiencedPlayers);
+      const sampleSize = countUniquePlayersForLevel_(levelData.vals);
+      bookshelfTag = buildExperiencedPlayerBookshelfTag_(experiencedCount, sampleSize);
+    }
     const analysis = calculateLevelAnalysis_(
       tierName,
       header.name,
@@ -186,7 +310,8 @@ function buildTierFlagScan_(tierName, tierSheet) {
 
     const flagContext = analysis.isPending
       ? buildPendingFlagContext_(levelData, analysis.countedRowFlags)
-      : null;
+      : {};
+    flagContext.experiencedBookshelfTag = bookshelfTag;
     const flagSummary = buildLevelFlagSummary_(analysis, flagContext);
     if (flagSummary.flags.length > 0) rows.push(buildTierFlagRow_(analysis, flagSummary));
   });
@@ -267,6 +392,10 @@ function buildLevelFlagSummary_(analysis, flagContext) {
     styleKey = "book";
     flag = formatBookAlert_(analysis.bookAlert);
     differenceAlert = analysis.bookAlert;
+  } else if (flagContext && flagContext.experiencedBookshelfTag) {
+    styleKey = "experienced_book";
+    flag = flagContext.experiencedBookshelfTag;
+    differenceAlert = null;
   } else if (needsMoreOpinionsAlert) {
     styleKey = "needs_more";
     flag = "needs more opinions";

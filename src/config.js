@@ -3,7 +3,7 @@
 const ANALYSIS_SHEET_NAME = "Tier Analysis";
 const FLAG_SCAN_SHEET_NAME = "Tier Flags";
 const TIER_CONFIG_SHEET_NAME = "Tier Configuration";
-const VERSION = "v1.13.0";
+const VERSION = "v1.14.0";
 const TIER_CELL = "B1";
 const LEVEL_CELL = "B2";
 const DATA_START_ROW = 4;                      // where A:C gets populated
@@ -29,6 +29,27 @@ const COUNTED_PLAYER_HIGHLIGHT = "#e6f4ea";
 const DUPLICATE_PLAYER_HIGHLIGHT = "#f9ab00";
 const PRE_UPDATE_PLAYER_HIGHLIGHT = "#b4a7d6";
 const LEVEL_LOCK_BLACK_MARKER = "#010000";
+
+// Optional experienced-player roster. Paste the full Google Sheets URL below.
+// Leave blank to disable experienced-player bookmark eligibility.
+const EXPERIENCED_PLAYER_ROSTER_SPREADSHEET_URL = "";
+const EXPERIENCED_PLAYER_DEFAULT_ROSTER_TAB = "Experienced Players";
+const EXPERIENCED_PLAYER_LOW_SHARE_MAX = 0.25;
+const EXPERIENCED_PLAYER_HIGH_SHARE_MIN = 0.75;
+
+function experiencedPlayerSpreadsheetId_(value) {
+  const configuredValue = String(value || "").trim();
+  if (!configuredValue) return "";
+  const urlMatch = configuredValue.match(/\/spreadsheets\/d\/([^/?#]+)/i);
+  return urlMatch ? urlMatch[1] : configuredValue;
+}
+
+function readExperiencedPlayerConfiguration_() {
+  return {
+    spreadsheetId: experiencedPlayerSpreadsheetId_(EXPERIENCED_PLAYER_ROSTER_SPREADSHEET_URL),
+    rosterTabName: EXPERIENCED_PLAYER_DEFAULT_ROSTER_TAB
+  };
+}
 
 function isAnalyzerUtilitySheetName_(name) {
   return name === ANALYSIS_SHEET_NAME ||
