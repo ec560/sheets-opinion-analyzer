@@ -2,6 +2,7 @@
 const OPINION_VALIDATION_RULE_FORMULA = '=N("TIER_TOOLS_OPINION_VALIDATION_V1")=0';
 const OPINION_VALIDATION_RANGES_PER_RULE = 250;
 const OPINION_VALIDATION_HIGHLIGHT = "#6fcf97";
+const OPINION_VALIDATION_UNRECOGNIZED_HIGHLIGHT = "#ff0000";
 const LEGACY_COUNTED_OPINIONS_RULE_FORMULA = '=N("TIER_TOOLS_COUNTED_OPINIONS_V1")=0';
 
 // Keep previously assigned buttons working after the menu action is renamed.
@@ -84,7 +85,8 @@ function toggleTierOpinionValidation_(sheet) {
   const allRangeGroups = [
     { ranges: scan.duplicateRanges, background: DUPLICATE_PLAYER_HIGHLIGHT },
     { ranges: scan.preUpdateDuplicateRanges, background: PRE_UPDATE_PLAYER_HIGHLIGHT },
-    { ranges: scan.ranges, background: OPINION_VALIDATION_HIGHLIGHT }
+    { ranges: scan.ranges, background: OPINION_VALIDATION_HIGHLIGHT },
+    { ranges: scan.unrecognizedRanges, background: OPINION_VALIDATION_UNRECOGNIZED_HIGHLIGHT }
   ];
   if (!allRangeGroups.some(group => group.ranges.length)) {
     return { message: 'No recognized opinion colors to highlight on "' + tierName + '".' + invalidMessage + skippedMessage };
@@ -120,7 +122,8 @@ function buildTierOpinionValidationRanges_(sheet) {
     skippedMerged: 0,
     ranges: [],
     duplicateRanges: [],
-    preUpdateDuplicateRanges: []
+    preUpdateDuplicateRanges: [],
+    unrecognizedRanges: []
   };
   const lastCol = sheet.getLastColumn();
   if (lastCol === 0) return result;
@@ -147,6 +150,7 @@ function buildTierOpinionValidationRanges_(sheet) {
     const rows = [];
     const duplicateRows = [];
     const preUpdateDuplicateRows = [];
+    const unrecognizedRows = [];
     data.vals.forEach((value, index) => {
       // Extraction excludes fully blank rows, all recognized reliability types included.
       const row = data.sourceRows[index];
@@ -156,8 +160,16 @@ function buildTierOpinionValidationRanges_(sheet) {
         return;
       }
       const recognized = isRecognizedOpinionColor_(data.bgs[index][1]);
-      if (recognized) result.highlighted++;
-      else result.unrecognized++;
+      if (!recognized) {
+        const hasPlayerAndOpinion = String(value[0] ?? "").trim() !== "" &&
+          String(value[1] ?? "").trim() !== "";
+        if (hasPlayerAndOpinion) {
+          unrecognizedRows.push(row);
+          result.unrecognized++;
+        }
+        return;
+      }
+      result.highlighted++;
 
       if (duplicateHighlights[index] === DUPLICATE_PLAYER_HIGHLIGHT) {
         duplicateRows.push(row);
@@ -177,6 +189,9 @@ function buildTierOpinionValidationRanges_(sheet) {
     }
     for (const run of opinionValidationRowRuns_(preUpdateDuplicateRows)) {
       result.preUpdateDuplicateRanges.push(sheet.getRange(run.start, header.col, run.length, 1));
+    }
+    for (const run of opinionValidationRowRuns_(unrecognizedRows)) {
+      result.unrecognizedRanges.push(sheet.getRange(run.start, header.col, run.length, 1));
     }
   }
   return result;
