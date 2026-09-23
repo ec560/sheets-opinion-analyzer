@@ -14,6 +14,13 @@ const TIER_FLAG_STYLES = {
     styleDifference: true
   },
   experienced_book: {
+    priority: 6,
+    background: "#d9f7fa",
+    text: "#0b5963",
+    fontWeight: "normal",
+    styleDifference: false
+  },
+  experienced_book_extreme: {
     priority: 4,
     background: "#00ffff",
     text: "#00363a",
@@ -35,14 +42,14 @@ const TIER_FLAG_STYLES = {
     styleDifference: true
   },
   low_unsettled: {
-    priority: 6,
+    priority: 7,
     background: "#fce8e6",
     text: "#b3261e",
     fontWeight: "bold",
     styleDifference: true
   },
   low_solid: {
-    priority: 7,
+    priority: 8,
     background: "#f1f3f4",
     text: "#5f6368",
     fontWeight: "normal",
@@ -191,23 +198,38 @@ function countUniquePlayersForLevel_(values) {
   return players.size;
 }
 
-function buildExperiencedPlayerBookshelfTag_(experiencedCount, sampleSize) {
+function buildExperiencedPlayerBookshelfFlag_(experiencedCount, sampleSize, totalOpinions) {
   const total = Number(sampleSize);
   const experienced = Number(experiencedCount);
+  const opinions = Number(totalOpinions);
   if (!Number.isFinite(total) || total <= 0 || !Number.isFinite(experienced) || experienced < 0) {
-    return "";
+    return null;
   }
+  if (!Number.isFinite(opinions) || opinions < 0 ||
+    opinions >= EXPERIENCED_PLAYER_OPINION_EXEMPT_THRESHOLD) return null;
 
   const share = experienced / total;
-  const percentage = Math.round(share * 100);
+  const percentage = (share * 100).toFixed(1).replace(/\.0$/, "");
   const detail = experienced + "/" + total + ", " + percentage + "%";
-  if (share <= EXPERIENCED_PLAYER_LOW_SHARE_MAX) {
-    return "few experienced (" + detail + ")";
+  if (share > EXPERIENCED_PLAYER_HIGH_SHARE_THRESHOLD) {
+    return {
+      text: "many experienced (" + detail + ")",
+      emphasized: share > EXPERIENCED_PLAYER_EMPHASIS_HIGH_SHARE_THRESHOLD
+    };
   }
-  if (share >= EXPERIENCED_PLAYER_HIGH_SHARE_MIN) {
-    return "many experienced (" + detail + ")";
+  if (share < EXPERIENCED_PLAYER_LOW_SHARE_THRESHOLD &&
+    experienced < EXPERIENCED_PLAYER_LOW_COUNT_THRESHOLD) {
+    return {
+      text: "few experienced (" + detail + ")",
+      emphasized: share < EXPERIENCED_PLAYER_EMPHASIS_LOW_SHARE_THRESHOLD
+    };
   }
-  return "";
+  return null;
+}
+
+function buildExperiencedPlayerBookshelfTag_(experiencedCount, sampleSize, totalOpinions) {
+  const flag = buildExperiencedPlayerBookshelfFlag_(experiencedCount, sampleSize, totalOpinions);
+  return flag ? flag.text : "";
 }
 
 function scanSelectedTierFlags() {
@@ -291,13 +313,20 @@ function buildTierFlagScan_(tierName, tierSheet) {
   const experiencedPlayers = loadExperiencedPlayerNames_(experiencedPlayerConfig);
 
   const rows = [];
-  headers.forEach(header => {
+  const platformerStartIndex = findFinalAlphabeticalFlagRestart_(headers);
+  headers.forEach((header, headerIndex) => {
+    const sectionIndex = platformerStartIndex >= 0 && headerIndex >= platformerStartIndex ? 1 : 0;
+
     const levelData = extractLevelFlagData_(header, vals, bgs, fcs, lastCol);
-    let bookshelfTag = "";
+    let bookshelfFlag = null;
     if (experiencedPlayers !== null) {
       const experiencedCount = countExperiencedPlayersForLevel_(levelData.vals, experiencedPlayers);
       const sampleSize = countUniquePlayersForLevel_(levelData.vals);
-      bookshelfTag = buildExperiencedPlayerBookshelfTag_(experiencedCount, sampleSize);
+      bookshelfFlag = buildExperiencedPlayerBookshelfFlag_(
+        experiencedCount,
+        sampleSize,
+        levelData.vals.length
+      );
     }
     const analysis = calculateLevelAnalysis_(
       tierName,
@@ -311,15 +340,38 @@ function buildTierFlagScan_(tierName, tierSheet) {
     const flagContext = analysis.isPending
       ? buildPendingFlagContext_(levelData, analysis.countedRowFlags)
       : {};
-    flagContext.experiencedBookshelfTag = bookshelfTag;
+    flagContext.experiencedBookshelfTag = bookshelfFlag ? bookshelfFlag.text : "";
+    flagContext.experiencedBookshelfEmphasized = !!(bookshelfFlag && bookshelfFlag.emphasized);
     const flagSummary = buildLevelFlagSummary_(analysis, flagContext);
-    if (flagSummary.flags.length > 0) rows.push(buildTierFlagRow_(analysis, flagSummary));
+    if (flagSummary.flags.length > 0) {
+      const flagRow = buildTierFlagRow_(analysis, flagSummary);
+      flagRow.sectionIndex = sectionIndex;
+      rows.push(flagRow);
+    }
   });
 
   return {
     scanned: headers.length,
     rows
   };
+}
+
+function findFinalAlphabeticalFlagRestart_(headers) {
+  if (!headers || headers.length < 2) return -1;
+  let finalRestart = -1;
+
+  for (let index = 1; index < headers.length; index++) {
+    const previousName = String(headers[index - 1].name || "").trim().toLocaleLowerCase();
+    const currentName = String(headers[index].name || "").trim().toLocaleLowerCase();
+    const nextName = index + 1 < headers.length
+      ? String(headers[index + 1].name || "").trim().toLocaleLowerCase()
+      : "";
+    const resets = previousName && currentName && currentName.localeCompare(previousName) < 0;
+    const alphabeticalRunResumes = !nextName || nextName.localeCompare(currentName) >= 0;
+    if (resets && alphabeticalRunResumes) finalRestart = index;
+  }
+
+  return finalRestart;
 }
 
 function extractLevelFlagData_(header, vals, bgs, fcs, lastCol) {
@@ -392,14 +444,19 @@ function buildLevelFlagSummary_(analysis, flagContext) {
     styleKey = "book";
     flag = formatBookAlert_(analysis.bookAlert);
     differenceAlert = analysis.bookAlert;
-  } else if (flagContext && flagContext.experiencedBookshelfTag) {
-    styleKey = "experienced_book";
+  } else if (flagContext && flagContext.experiencedBookshelfTag &&
+    flagContext.experiencedBookshelfEmphasized) {
+    styleKey = "experienced_book_extreme";
     flag = flagContext.experiencedBookshelfTag;
     differenceAlert = null;
   } else if (needsMoreOpinionsAlert) {
     styleKey = "needs_more";
     flag = "needs more opinions";
     differenceAlert = needsMoreOpinionsAlert;
+  } else if (flagContext && flagContext.experiencedBookshelfTag) {
+    styleKey = "experienced_book";
+    flag = flagContext.experiencedBookshelfTag;
+    differenceAlert = null;
   } else if (lowOpinionAlert) {
     styleKey = lowOpinionAlert.subdued ? "low_solid" : "low_unsettled";
     flag = lowOpinionAlert.text;
@@ -689,6 +746,31 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
     .setFontColors(fontColors)
     .setFontWeights(fontWeights)
     .setFontStyles(fontStyles);
+
+  applyTierFlagSectionBorders_(sh, flagRows, colCount);
+}
+
+function applyTierFlagSectionBorders_(sh, flagRows, colCount) {
+  if (!flagRows || flagRows.length < 2) return;
+
+  for (let index = 1; index < flagRows.length; index++) {
+    const previousSection = Number(flagRows[index - 1].sectionIndex) || 0;
+    const currentSection = Number(flagRows[index].sectionIndex) || 0;
+    if (currentSection === previousSection) continue;
+
+    // Output begins on row 3; index points at the first row in the new section,
+    // so index + 2 is the preceding section's final displayed row.
+    sh.getRange(index + 2, 1, 1, colCount).setBorder(
+      null,
+      null,
+      true,
+      null,
+      null,
+      null,
+      "#9aa0a6",
+      SpreadsheetApp.BorderStyle.DOTTED
+    );
+  }
 }
 
 function styleTierFlagCell_(sh, row, col, tierName) {
