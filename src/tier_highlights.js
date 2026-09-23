@@ -78,31 +78,50 @@ function toggleTierOpinionValidation_(sheet) {
     ? " " + scan.skippedMerged + " opinion row(s) skipped because the username cell is merged."
     : "";
   const invalidMessage = " " + scan.unrecognized + " unrecognized opinion color(s).";
-  if (scan.ranges.length === 0) {
+  const duplicateMessage = scan.duplicates
+    ? " " + scan.duplicates + " duplicate opinion(s) highlighted."
+    : "";
+  const allRangeGroups = [
+    { ranges: scan.duplicateRanges, background: DUPLICATE_PLAYER_HIGHLIGHT },
+    { ranges: scan.preUpdateDuplicateRanges, background: PRE_UPDATE_PLAYER_HIGHLIGHT },
+    { ranges: scan.ranges, background: OPINION_VALIDATION_HIGHLIGHT }
+  ];
+  if (!allRangeGroups.some(group => group.ranges.length)) {
     return { message: 'No recognized opinion colors to highlight on "' + tierName + '".' + invalidMessage + skippedMessage };
   }
 
   const overlays = [];
   // Keep sparse, wide tier sheets to a small number of rules, with bounded lists.
-  for (let i = 0; i < scan.ranges.length; i += OPINION_VALIDATION_RANGES_PER_RULE) {
-    overlays.push(SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied(OPINION_VALIDATION_RULE_FORMULA)
-      .setBackground(OPINION_VALIDATION_HIGHLIGHT)
-      .setFontColor("#000000")
-      .setRanges(scan.ranges.slice(i, i + OPINION_VALIDATION_RANGES_PER_RULE))
-      .build());
+  for (const group of allRangeGroups) {
+    for (let i = 0; i < group.ranges.length; i += OPINION_VALIDATION_RANGES_PER_RULE) {
+      overlays.push(SpreadsheetApp.newConditionalFormatRule()
+        .whenFormulaSatisfied(OPINION_VALIDATION_RULE_FORMULA)
+        .setBackground(group.background)
+        .setFontColor("#000000")
+        .setRanges(group.ranges.slice(i, i + OPINION_VALIDATION_RANGES_PER_RULE))
+        .build());
+    }
   }
   // Install only after the full scan succeeds. Read existing rules again so edits
   // made to other formatting during the scan are retained, in their original order.
   sheet.setConditionalFormatRules(overlays.concat(sheet.getConditionalFormatRules()));
   return {
     message: scan.highlighted + ' recognized opinion color(s) highlighted on "' + tierName +
-      '" across ' + scan.scanned + " level(s)." + invalidMessage + skippedMessage
+      '" across ' + scan.scanned + " level(s)." + duplicateMessage + invalidMessage + skippedMessage
   };
 }
 
 function buildTierOpinionValidationRanges_(sheet) {
-  const result = { scanned: 0, highlighted: 0, unrecognized: 0, skippedMerged: 0, ranges: [] };
+  const result = {
+    scanned: 0,
+    highlighted: 0,
+    duplicates: 0,
+    unrecognized: 0,
+    skippedMerged: 0,
+    ranges: [],
+    duplicateRanges: [],
+    preUpdateDuplicateRanges: []
+  };
   const lastCol = sheet.getLastColumn();
   if (lastCol === 0) return result;
   const headers = getLevelHeaders_(sheet);
@@ -123,8 +142,11 @@ function buildTierOpinionValidationRanges_(sheet) {
 
   for (const header of headers) {
     const data = extractLevelFlagData_(header, vals, bgs, fcs, lastCol);
+    const duplicateHighlights = buildDuplicatePlayerHighlights_(data.vals);
     const playerMerges = merged.filter(merge => header.col >= merge.firstCol && header.col <= merge.lastCol);
     const rows = [];
+    const duplicateRows = [];
+    const preUpdateDuplicateRows = [];
     data.vals.forEach((value, index) => {
       // Extraction excludes fully blank rows, all recognized reliability types included.
       const row = data.sourceRows[index];
@@ -133,15 +155,28 @@ function buildTierOpinionValidationRanges_(sheet) {
         result.skippedMerged++;
         return;
       }
-      if (!isRecognizedOpinionColor_(data.bgs[index][1])) {
-        result.unrecognized++;
-        return;
+      const recognized = isRecognizedOpinionColor_(data.bgs[index][1]);
+      if (recognized) result.highlighted++;
+      else result.unrecognized++;
+
+      if (duplicateHighlights[index] === DUPLICATE_PLAYER_HIGHLIGHT) {
+        duplicateRows.push(row);
+        result.duplicates++;
+      } else if (duplicateHighlights[index] === PRE_UPDATE_PLAYER_HIGHLIGHT) {
+        preUpdateDuplicateRows.push(row);
+        result.duplicates++;
+      } else if (recognized) {
+        rows.push(row);
       }
-      rows.push(row);
     });
-    result.highlighted += rows.length;
     for (const run of opinionValidationRowRuns_(rows)) {
       result.ranges.push(sheet.getRange(run.start, header.col, run.length, 1));
+    }
+    for (const run of opinionValidationRowRuns_(duplicateRows)) {
+      result.duplicateRanges.push(sheet.getRange(run.start, header.col, run.length, 1));
+    }
+    for (const run of opinionValidationRowRuns_(preUpdateDuplicateRows)) {
+      result.preUpdateDuplicateRanges.push(sheet.getRange(run.start, header.col, run.length, 1));
     }
   }
   return result;
