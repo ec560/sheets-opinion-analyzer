@@ -407,41 +407,45 @@ function findPlatformerSectionStartIndex_(tierSheet, headers, bodyValues) {
     const lastColumn = tierSheet.getLastColumn();
     const headerRange = tierSheet.getRange(1, 1, 1, lastColumn);
     const headerValues = headerRange.getDisplayValues()[0];
-    for (let platformerColumn = 1; platformerColumn <= headerValues.length; platformerColumn++) {
-      const label = String(headerValues[platformerColumn - 1] || "").trim();
-      if (!/\bplatformer\b/i.test(label)) continue;
-      const startIndex = platformerColumn - 1;
-      const hasLevelData = (bodyValues || []).some(row => {
-        return [0, 1, 2].some(offset => String(row[startIndex + offset] || "").trim() !== "");
+    const headerMerges = headerRange.getMergedRanges();
+    const bodyRowCount = Math.max(0, tierSheet.getLastRow() - 1);
+
+    for (const headerMerge of headerMerges) {
+      if (headerMerge.getRow() !== 1 || headerMerge.getNumRows() !== 1) continue;
+      const platformerColumn = headerMerge.getColumn();
+      const label = String(headerValues[platformerColumn - 1] || "").trim().toLocaleLowerCase();
+      if (label !== "platformer") continue;
+
+      const markerWidth = headerMerge.getNumColumns();
+      const markerEndColumn = platformerColumn + markerWidth - 1;
+      let markerLabelCount = 0;
+      const markerBodyHasNoOpinions = (bodyValues || []).every(row => {
+        for (let offset = 0; offset < markerWidth; offset++) {
+          const value = String(row[platformerColumn - 1 + offset] || "").trim();
+          if (!value) continue;
+          if (offset !== 0) return false;
+          markerLabelCount++;
+          if (markerLabelCount > 1) return false;
+        }
+        return true;
       });
-      const isLevelHeader = headers.some(header => header.col === platformerColumn);
-      if (!isLevelHeader || !hasLevelData) {
-        return headers.findIndex(header => header.col > platformerColumn);
-      }
+      if (!markerBodyHasNoOpinions || bodyRowCount === 0) continue;
+
+      const bodyRange = tierSheet.getRange(2, platformerColumn, bodyRowCount, markerWidth);
+      const hasMergedBody = bodyRange.getMergedRanges().some(bodyMerge => {
+        return bodyMerge.getRow() === 2 &&
+          bodyMerge.getColumn() === platformerColumn &&
+          bodyMerge.getNumColumns() === markerWidth;
+      });
+      if (!hasMergedBody) continue;
+
+      return headers.findIndex(header => header.col > markerEndColumn);
     }
   } catch (error) {
-    // Lightweight test doubles may not expose the complete row-one range API.
+    // Lightweight test doubles may not expose merged-range metadata.
   }
 
-  return findFinalAlphabeticalFlagRestart_(headers);
-}
-
-function findFinalAlphabeticalFlagRestart_(headers) {
-  if (!headers || headers.length < 2) return -1;
-  let finalRestart = -1;
-
-  for (let index = 1; index < headers.length; index++) {
-    const previousName = String(headers[index - 1].name || "").trim().toLocaleLowerCase();
-    const currentName = String(headers[index].name || "").trim().toLocaleLowerCase();
-    const nextName = index + 1 < headers.length
-      ? String(headers[index + 1].name || "").trim().toLocaleLowerCase()
-      : "";
-    const resets = previousName && currentName && currentName.localeCompare(previousName) < 0;
-    const alphabeticalRunResumes = !nextName || nextName.localeCompare(currentName) >= 0;
-    if (resets && alphabeticalRunResumes) finalRestart = index;
-  }
-
-  return finalRestart;
+  return -1;
 }
 
 function extractLevelFlagData_(header, vals, bgs, fcs, lastCol) {
@@ -857,22 +861,6 @@ function applyTierFlagSectionBorders_(sh, flagRows, colCount) {
     return;
   }
 
-  const displayedHeaders = flagRows.map(row => ({
-    name: row && row.values ? row.values[0] : ""
-  }));
-  const displayedRestartIndex = findFinalAlphabeticalFlagRestart_(displayedHeaders);
-  if (displayedRestartIndex > 0) {
-    sh.getRange(displayedRestartIndex + 2, 1, 1, colCount).setBorder(
-      null,
-      null,
-      true,
-      null,
-      null,
-      null,
-      "#9aa0a6",
-      SpreadsheetApp.BorderStyle.DOTTED
-    );
-  }
 }
 
 function styleTierFlagCell_(sh, row, col, tierName) {
