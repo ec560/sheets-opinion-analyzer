@@ -352,7 +352,7 @@ function buildTierFlagScan_(tierName, tierSheet) {
   const experiencedPlayerRosters = loadExperiencedPlayerRosters_(experiencedPlayerConfig);
 
   const rows = [];
-  const platformerStartIndex = findPlatformerSectionStartIndex_(tierSheet, headers);
+  const platformerStartIndex = findPlatformerSectionStartIndex_(tierSheet, headers, vals);
   headers.forEach((header, headerIndex) => {
     const sectionIndex = platformerStartIndex >= 0 && headerIndex >= platformerStartIndex ? 1 : 0;
 
@@ -400,31 +400,27 @@ function buildTierFlagScan_(tierName, tierSheet) {
   };
 }
 
-function findPlatformerSectionStartIndex_(tierSheet, headers) {
+function findPlatformerSectionStartIndex_(tierSheet, headers, bodyValues) {
   if (!tierSheet || !headers || headers.length === 0) return -1;
 
   try {
     const lastColumn = tierSheet.getLastColumn();
     const headerRange = tierSheet.getRange(1, 1, 1, lastColumn);
     const headerValues = headerRange.getDisplayValues()[0];
-    const mergedRanges = headerRange.getMergedRanges();
-    let platformerEndColumn = -1;
-
-    for (const mergedRange of mergedRanges) {
-      if (mergedRange.getRow() !== 1 || mergedRange.getNumRows() !== 1 ||
-        mergedRange.getNumColumns() === 3) continue;
-      const startColumn = mergedRange.getColumn();
-      const label = String(headerValues[startColumn - 1] || "").trim().toLocaleLowerCase();
-      if (label !== "platformer") continue;
-      platformerEndColumn = startColumn + mergedRange.getNumColumns() - 1;
-      break;
-    }
-
-    if (platformerEndColumn >= 0) {
-      return headers.findIndex(header => header.col > platformerEndColumn);
+    for (let platformerColumn = 1; platformerColumn <= headerValues.length; platformerColumn++) {
+      const label = String(headerValues[platformerColumn - 1] || "").trim();
+      if (!/\bplatformer\b/i.test(label)) continue;
+      const startIndex = platformerColumn - 1;
+      const hasLevelData = (bodyValues || []).some(row => {
+        return [0, 1, 2].some(offset => String(row[startIndex + offset] || "").trim() !== "");
+      });
+      const isLevelHeader = headers.some(header => header.col === platformerColumn);
+      if (!isLevelHeader || !hasLevelData) {
+        return headers.findIndex(header => header.col > platformerColumn);
+      }
     }
   } catch (error) {
-    // Legacy sheets and lightweight test doubles may not expose merge metadata.
+    // Lightweight test doubles may not expose the complete row-one range API.
   }
 
   return findFinalAlphabeticalFlagRestart_(headers);
@@ -825,7 +821,21 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
 }
 
 function applyTierFlagSectionBorders_(sh, flagRows, colCount) {
-  if (!flagRows || flagRows.length < 2) return;
+  if (!flagRows || flagRows.length === 0) return;
+
+  if ((Number(flagRows[0].sectionIndex) || 0) === 1) {
+    sh.getRange(3, 1, 1, colCount).setBorder(
+      true,
+      null,
+      null,
+      null,
+      null,
+      null,
+      "#9aa0a6",
+      SpreadsheetApp.BorderStyle.DOTTED
+    );
+    return;
+  }
 
   for (let index = 1; index < flagRows.length; index++) {
     const previousSection = Number(flagRows[index - 1].sectionIndex) || 0;
@@ -835,6 +845,24 @@ function applyTierFlagSectionBorders_(sh, flagRows, colCount) {
     // Output begins on row 3; index points at the first row in the new section,
     // so index + 2 is the preceding section's final displayed row.
     sh.getRange(index + 2, 1, 1, colCount).setBorder(
+      null,
+      null,
+      true,
+      null,
+      null,
+      null,
+      "#9aa0a6",
+      SpreadsheetApp.BorderStyle.DOTTED
+    );
+    return;
+  }
+
+  const displayedHeaders = flagRows.map(row => ({
+    name: row && row.values ? row.values[0] : ""
+  }));
+  const displayedRestartIndex = findFinalAlphabeticalFlagRestart_(displayedHeaders);
+  if (displayedRestartIndex > 0) {
+    sh.getRange(displayedRestartIndex + 2, 1, 1, colCount).setBorder(
       null,
       null,
       true,
