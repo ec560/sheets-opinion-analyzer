@@ -3,7 +3,7 @@
 const ANALYSIS_SHEET_NAME = "Tier Analysis";
 const FLAG_SCAN_SHEET_NAME = "Tier Flags";
 const TIER_CONFIG_SHEET_NAME = "Tier Configuration";
-const VERSION = "v1.14.0";
+const VERSION = "v1.14.1";
 const TIER_CELL = "B1";
 const LEVEL_CELL = "B2";
 const DATA_START_ROW = 4;                      // where A:C gets populated
@@ -34,6 +34,8 @@ const LEVEL_LOCK_BLACK_MARKER = "#010000";
 // Leave blank to disable experienced-player bookmark eligibility.
 const EXPERIENCED_PLAYER_ROSTER_SPREADSHEET_URL = "";
 const EXPERIENCED_PLAYER_DEFAULT_ROSTER_TAB = "Experienced Players";
+const EXPERIENCED_PLAYER_CLASSIC_HEADER = "Sheet Name";
+const EXPERIENCED_PLAYER_PLATFORMER_HEADER = "Platformer Sheet Name";
 const EXPERIENCED_PLAYER_LOW_SHARE_THRESHOLD = 0.2;
 const EXPERIENCED_PLAYER_HIGH_SHARE_THRESHOLD = 0.75;
 const EXPERIENCED_PLAYER_LOW_COUNT_THRESHOLD = 5;

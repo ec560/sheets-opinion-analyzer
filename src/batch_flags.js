@@ -127,7 +127,7 @@ function experiencedPlayerRosterError_(message) {
   return error;
 }
 
-function loadExperiencedPlayerNames_(configuration) {
+function loadExperiencedPlayerRosters_(configuration) {
   const config = configuration || readExperiencedPlayerConfiguration_();
   const spreadsheetId = String(config && config.spreadsheetId || "").trim();
   if (!spreadsheetId) return null;
@@ -150,34 +150,73 @@ function loadExperiencedPlayerNames_(configuration) {
   }
   if (!rosterSheet) return null;
 
-  let header;
-  let values;
+  let classicHeader;
+  let platformerHeader;
+  let classicValues;
+  let platformerValues;
   try {
-    header = rosterSheet.getRange("A1").getDisplayValue();
+    classicHeader = rosterSheet.getRange("A1").getDisplayValue();
+    platformerHeader = rosterSheet.getRange("B1").getDisplayValue();
     const lastRow = rosterSheet.getLastRow();
-    values = lastRow > 1
+    classicValues = lastRow > 1
       ? rosterSheet.getRange(2, 1, lastRow - 1, 1).getValues()
+      : [];
+    platformerValues = lastRow > 1
+      ? rosterSheet.getRange(2, 2, lastRow - 1, 1).getValues()
       : [];
   } catch (error) {
     return null;
   }
 
-  if (String(header || "").trim() !== "Sheet Name") {
+  if (String(classicHeader || "").trim() !== EXPERIENCED_PLAYER_CLASSIC_HEADER) {
     throw experiencedPlayerRosterError_(
-      "cell A1 on \"" + rosterTabName + "\" must contain \"Sheet Name\"."
+      "cell A1 on \"" + rosterTabName + "\" must contain \"" +
+        EXPERIENCED_PLAYER_CLASSIC_HEADER + "\"."
     );
   }
 
+  const normalizedPlatformerHeader = String(platformerHeader || "").trim();
+  const hasPlatformerNames = platformerValues.some(row => normalizePlayerSheetName_(row && row[0]));
+  if (normalizedPlatformerHeader && normalizedPlatformerHeader !== EXPERIENCED_PLAYER_PLATFORMER_HEADER) {
+    throw experiencedPlayerRosterError_(
+      "cell B1 on \"" + rosterTabName + "\" must contain \"" +
+        EXPERIENCED_PLAYER_PLATFORMER_HEADER + "\"."
+    );
+  }
+  if (!normalizedPlatformerHeader && hasPlatformerNames) {
+    throw experiencedPlayerRosterError_(
+      "cell B1 on \"" + rosterTabName + "\" must contain \"" +
+        EXPERIENCED_PLAYER_PLATFORMER_HEADER + "\" when column B contains names."
+    );
+  }
+
+  return {
+    classic: buildExperiencedPlayerNameSet_(classicValues, "classic"),
+    platformer: normalizedPlatformerHeader
+      ? buildExperiencedPlayerNameSet_(platformerValues, "platformer")
+      : null
+  };
+}
+
+function buildExperiencedPlayerNameSet_(values, rosterLabel) {
   const experiencedPlayers = new Set();
   values.forEach(row => {
     const player = normalizePlayerSheetName_(row && row[0]);
     if (!player) return;
     if (experiencedPlayers.has(player)) {
-      throw experiencedPlayerRosterError_("duplicate sheet name \"" + player + "\".");
+      throw experiencedPlayerRosterError_(
+        "duplicate " + rosterLabel + " sheet name \"" + player + "\"."
+      );
     }
     experiencedPlayers.add(player);
   });
   return experiencedPlayers;
+}
+
+// Retained for callers that only need the original column-A roster.
+function loadExperiencedPlayerNames_(configuration) {
+  const rosters = loadExperiencedPlayerRosters_(configuration);
+  return rosters ? rosters.classic : null;
 }
 
 function countExperiencedPlayersForLevel_(values, experiencedPlayers) {
@@ -310,15 +349,20 @@ function buildTierFlagScan_(tierName, tierSheet) {
   }
   const headers = getLevelHeaders_(tierSheet, vals);
   const experiencedPlayerConfig = readExperiencedPlayerConfiguration_();
-  const experiencedPlayers = loadExperiencedPlayerNames_(experiencedPlayerConfig);
+  const experiencedPlayerRosters = loadExperiencedPlayerRosters_(experiencedPlayerConfig);
 
   const rows = [];
-  const platformerStartIndex = findFinalAlphabeticalFlagRestart_(headers);
+  const platformerStartIndex = findPlatformerSectionStartIndex_(tierSheet, headers);
   headers.forEach((header, headerIndex) => {
     const sectionIndex = platformerStartIndex >= 0 && headerIndex >= platformerStartIndex ? 1 : 0;
 
     const levelData = extractLevelFlagData_(header, vals, bgs, fcs, lastCol);
     let bookshelfFlag = null;
+    const experiencedPlayers = experiencedPlayerRosters === null
+      ? null
+      : (sectionIndex === 1
+        ? experiencedPlayerRosters.platformer
+        : experiencedPlayerRosters.classic);
     if (experiencedPlayers !== null) {
       const experiencedCount = countExperiencedPlayersForLevel_(levelData.vals, experiencedPlayers);
       const sampleSize = countUniquePlayersForLevel_(levelData.vals);
@@ -354,6 +398,36 @@ function buildTierFlagScan_(tierName, tierSheet) {
     scanned: headers.length,
     rows
   };
+}
+
+function findPlatformerSectionStartIndex_(tierSheet, headers) {
+  if (!tierSheet || !headers || headers.length === 0) return -1;
+
+  try {
+    const lastColumn = tierSheet.getLastColumn();
+    const headerRange = tierSheet.getRange(1, 1, 1, lastColumn);
+    const headerValues = headerRange.getDisplayValues()[0];
+    const mergedRanges = headerRange.getMergedRanges();
+    let platformerEndColumn = -1;
+
+    for (const mergedRange of mergedRanges) {
+      if (mergedRange.getRow() !== 1 || mergedRange.getNumRows() !== 1 ||
+        mergedRange.getNumColumns() === 3) continue;
+      const startColumn = mergedRange.getColumn();
+      const label = String(headerValues[startColumn - 1] || "").trim().toLocaleLowerCase();
+      if (label !== "platformer") continue;
+      platformerEndColumn = startColumn + mergedRange.getNumColumns() - 1;
+      break;
+    }
+
+    if (platformerEndColumn >= 0) {
+      return headers.findIndex(header => header.col > platformerEndColumn);
+    }
+  } catch (error) {
+    // Legacy sheets and lightweight test doubles may not expose merge metadata.
+  }
+
+  return findFinalAlphabeticalFlagRestart_(headers);
 }
 
 function findFinalAlphabeticalFlagRestart_(headers) {
