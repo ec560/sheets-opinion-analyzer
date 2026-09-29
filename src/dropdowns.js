@@ -107,9 +107,7 @@ function refreshLevelDropdown_() {
   const tierSheet = ss.getSheetByName(tierName);
   if (!tierSheet) return;
 
-  const headers = getLevelHeaders_(tierSheet).filter(header => {
-    return typeof isLevelLocked_ !== "function" || !isLevelLocked_(tierSheet, header.col);
-  }); // array of unlocked {name, col}
+  const headers = getLevelHeaders_(tierSheet); // array of {name, col}
   const headerNames = headers.map(h => h.name);
 
   const dvLevel = SpreadsheetApp.newDataValidation()
