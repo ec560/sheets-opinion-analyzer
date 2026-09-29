@@ -57,6 +57,7 @@ function setSelectedLevelLockState_(shouldLock) {
     target.sheet.getRange(1, target.startCol).setBackground(LEVEL_LOCK_BLACK_MARKER);
   }
   SpreadsheetApp.flush();
+  refreshAnalyzerAfterLockChange_(ss, target, shouldLock);
 
   if (failedSegments.length > 0) {
     ui.alert(
@@ -74,6 +75,24 @@ function setSelectedLevelLockState_(shouldLock) {
     3
   );
   return true;
+}
+
+function refreshAnalyzerAfterLockChange_(ss, target, shouldLock) {
+  const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
+  if (!tool) return;
+
+  const selectedTier = String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim();
+  const selectedLevel = String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim();
+  const changedLevelIsSelected = selectedTier === target.sheet.getName() &&
+    selectedLevel === target.name;
+
+  if (shouldLock && changedLevelIsSelected) {
+    tool.getRange(LEVEL_CELL).clearContent();
+    clearAnalysisArea_(tool);
+    renderAnalysisStatus_(tool);
+  }
+
+  if (typeof refreshLevelDropdown_ === "function") refreshLevelDropdown_();
 }
 
 function getSelectedLevelForLocking_(ss) {

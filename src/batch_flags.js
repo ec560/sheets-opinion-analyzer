@@ -307,7 +307,7 @@ function scanSelectedTierFlags() {
     throw error;
   }
   if (result.scanned === 0) {
-    ui.alert("Tier Flag Scan", "No level headers found on \"" + tierName + "\".", ui.ButtonSet.OK);
+    ui.alert("Tier Flag Scan", "No unlocked level headers found on \"" + tierName + "\".", ui.ButtonSet.OK);
     return;
   }
 
@@ -352,10 +352,13 @@ function buildTierFlagScan_(tierName, tierSheet) {
   const experiencedPlayerRosters = loadExperiencedPlayerRosters_(experiencedPlayerConfig);
 
   const rows = [];
+  let scanned = 0;
   const platformerStartIndex = findPlatformerSectionStartIndex_(tierSheet, headers, vals);
   headers.forEach((header, headerIndex) => {
     const sectionIndex = platformerStartIndex >= 0 && headerIndex >= platformerStartIndex ? 1 : 0;
 
+    if (typeof isLevelLocked_ === "function" && isLevelLocked_(tierSheet, header.col)) return;
+    scanned++;
     const levelData = extractLevelFlagData_(header, vals, bgs, fcs, lastCol);
     let bookshelfFlag = null;
     const experiencedPlayers = experiencedPlayerRosters === null
@@ -395,7 +398,7 @@ function buildTierFlagScan_(tierName, tierSheet) {
   });
 
   return {
-    scanned: headers.length,
+    scanned,
     rows
   };
 }

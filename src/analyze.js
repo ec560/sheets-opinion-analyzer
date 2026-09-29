@@ -2,6 +2,23 @@
 function analyzeSelectedLevel(options) {
   const ss = SpreadsheetApp.getActive();
   const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
+  if (!tool) {
+    SpreadsheetApp.getUi().alert("Run Tier Tools > Setup before analyzing opinions.");
+    return false;
+  }
+
+  const selectedTierName = String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim();
+  const selectedLevelName = String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim();
+  const expectedTierName = options && options.tierName != null
+    ? String(options.tierName).trim()
+    : selectedTierName;
+  const expectedLevelName = options && options.levelName != null
+    ? String(options.levelName).trim()
+    : selectedLevelName;
+
+  if (expectedTierName !== selectedTierName || expectedLevelName !== selectedLevelName) {
+    return false;
+  }
 
   if (typeof loadTierConfiguration_ === "function") {
     const configResult = loadTierConfiguration_();
@@ -27,8 +44,8 @@ function analyzeSelectedLevel(options) {
     }
   }
 
-  const tierName = tool.getRange(TIER_CELL).getDisplayValue().trim();
-  const levelName = tool.getRange(LEVEL_CELL).getDisplayValue().trim();
+  const tierName = expectedTierName;
+  const levelName = expectedLevelName;
   if (!tierName || !levelName) {
     SpreadsheetApp.getUi().alert("Pick a tier and a level first.");
     return;
@@ -168,6 +185,12 @@ function analyzeSelectedLevel(options) {
       const denominator = reliabilityDistribution.totalCount || 1;
       out.push([name, count, count / denominator, ""]);
     }
+  }
+
+  const currentTierName = String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim();
+  const currentLevelName = String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim();
+  if (currentTierName !== tierName || currentLevelName !== levelName) {
+    return false;
   }
 
   const startRow = 1;

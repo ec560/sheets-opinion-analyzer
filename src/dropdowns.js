@@ -22,19 +22,44 @@ function onEdit(e) {
     // also clear pasted data/output whenever tier changes
     clearAnalysisArea_();
     renderAnalysisStatus_(sh);
+    return;
   }
 
   if (a1 === LEVEL_CELL) {
     populateSelectedLevel({ skipTierDropdownRefresh: true });
+    return;
   }
+
+  if (rangeIntersectsLoadedOpinions_(range)) {
+    setAnalysisStatusMessage_(
+      sh,
+      "Opinions changed. Run Analyze Loaded Opinions",
+      "#fff4cc"
+    );
+  }
+}
+
+function rangeIntersectsLoadedOpinions_(range) {
+  if (!range || typeof range.getRow !== "function" || typeof range.getColumn !== "function") {
+    return false;
+  }
+
+  const row = range.getRow();
+  const col = range.getColumn();
+  const numRows = typeof range.getNumRows === "function" ? range.getNumRows() : 1;
+  const numCols = typeof range.getNumColumns === "function" ? range.getNumColumns() : 1;
+  const lastRow = row + numRows - 1;
+  const lastCol = col + numCols - 1;
+
+  return lastRow >= DATA_START_ROW && col <= 3 && lastCol >= 1;
 }
 
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu("Tier Tools")
     .addItem("Setup", "setupTierAnalysis")
-    .addItem("Refresh", "populateSelectedLevel")
-    .addItem("Analyze Selected Level", "analyzeSelectedLevel")
+    .addItem("Reload Selected Level", "populateSelectedLevel")
+    .addItem("Analyze Loaded Opinions", "analyzeSelectedLevel")
     .addSeparator()
     .addItem("Lock/Unlock Selected Level", "toggleSelectedLevelLock")
     .addSeparator()
@@ -82,7 +107,9 @@ function refreshLevelDropdown_() {
   const tierSheet = ss.getSheetByName(tierName);
   if (!tierSheet) return;
 
-  const headers = getLevelHeaders_(tierSheet); // array of {name, col}
+  const headers = getLevelHeaders_(tierSheet).filter(header => {
+    return typeof isLevelLocked_ !== "function" || !isLevelLocked_(tierSheet, header.col);
+  }); // array of unlocked {name, col}
   const headerNames = headers.map(h => h.name);
 
   const dvLevel = SpreadsheetApp.newDataValidation()
@@ -188,9 +215,8 @@ function headerGroupHasData_(bodyValues, startCol) {
   return false;
 }
 
-// clear A:C and output area
-function clearAnalysisArea_() {
-  const sh = SpreadsheetApp.getActive().getSheetByName(ANALYSIS_SHEET_NAME);
+function clearLoadedOpinionData_(sh) {
+  if (!sh) return;
   const lastRow = sh.getLastRow();
   const height = Math.max(0, lastRow - DATA_START_ROW + 1);
   if (height > 0) {
@@ -201,5 +227,12 @@ function clearAnalysisArea_() {
       .setFontFamily("Mukta")
       .setFontSize(10);
   }
+}
+
+// clear A:C and output area
+function clearAnalysisArea_(tool) {
+  const sh = tool || SpreadsheetApp.getActive().getSheetByName(ANALYSIS_SHEET_NAME);
+  if (!sh) return;
+  clearLoadedOpinionData_(sh);
   clearAnalysisOutput_(sh, true);
 }

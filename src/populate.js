@@ -39,48 +39,76 @@ function getLevelLastRow_(tierSheet, startCol, numCols) {
 }
 
 function populateSelectedLevel(options) {
+  const lock = typeof LockService !== "undefined" && LockService.getDocumentLock
+    ? LockService.getDocumentLock()
+    : null;
+  if (lock) lock.waitLock(30000);
+
+  try {
+    return populateSelectedLevelUnlocked_(options);
+  } finally {
+    if (lock) lock.releaseLock();
+  }
+}
+
+function populateSelectedLevelUnlocked_(options) {
   const ss = SpreadsheetApp.getActive();
   const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
+  if (!tool) {
+    SpreadsheetApp.getUi().alert("Run Tier Tools > Setup before loading a level.");
+    return false;
+  }
   if (!options || !options.skipTierDropdownRefresh) refreshTierDropdown_();
+
+  const tierName = String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim();
+  const levelName = String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim();
 
   if (typeof loadTierConfiguration_ === "function") {
     const configResult = loadTierConfiguration_();
     if (!configResult.valid && !configResult.missing) {
-      setAnalysisStatusMessage_(tool, "Error with Tier Configuration", "#fce8e6");
-      return false;
+      return failSelectedLevelLoad_(
+        tool,
+        tierName,
+        levelName,
+        "Error with Tier Configuration",
+        "#fce8e6"
+      );
     }
   }
 
-  const tierName = tool.getRange(TIER_CELL).getDisplayValue().trim();
-  const levelName = tool.getRange(LEVEL_CELL).getDisplayValue().trim();
   if (!tierName || !levelName) {
+    clearAnalysisArea_(tool);
     renderAnalysisStatus_(tool);
     return false;
   }
 
-  clearAnalysisArea_();
-
   const tierSheet = ss.getSheetByName(tierName);
   if (!tierSheet) {
-    setAnalysisStatusMessage_(tool, "Failed to load opinions", "#fce8e6");
-    return false;
+    return failSelectedLevelLoad_(tool, tierName, levelName, "Failed to load opinions", "#fce8e6");
   }
 
   const headers = getLevelHeaders_(tierSheet);
   const header = headers.find(h => h.name === levelName);
   if (!header) {
-    setAnalysisStatusMessage_(tool, "Failed to load opinions", "#fce8e6");
-    return false;
+    return failSelectedLevelLoad_(tool, tierName, levelName, "Failed to load opinions", "#fce8e6");
   }
 
   const startCol = header.col;
   const numCols = 3; // player/opinion/reliability
+  if (typeof isLevelLocked_ === "function" && isLevelLocked_(tierSheet, startCol)) {
+    return failSelectedLevelLoad_(
+      tool,
+      tierName,
+      levelName,
+      "Locked levels cannot be analyzed",
+      "#fff4cc"
+    );
+  }
   const lastRow = getLevelLastRow_(tierSheet, startCol, numCols);
   const numRows = Math.max(0, lastRow - 1);
 
   if (numRows === 0) {
-    setAnalysisStatusMessage_(tool, "Failed: no opinions found", "#fce8e6");
-    return false;
+    return failSelectedLevelLoad_(tool, tierName, levelName, "Failed: no opinions found", "#fce8e6");
   }
 
   const srcRange = tierSheet.getRange(2, startCol, numRows, numCols);
@@ -109,9 +137,14 @@ function populateSelectedLevel(options) {
   }
 
   if (outVals.length === 0) {
-    setAnalysisStatusMessage_(tool, "Failed: no opinions found", "#fce8e6");
+    return failSelectedLevelLoad_(tool, tierName, levelName, "Failed: no opinions found", "#fce8e6");
+  }
+
+  if (!selectedLevelStillCurrent_(tool, tierName, levelName)) {
     return false;
   }
+
+  clearAnalysisArea_(tool);
 
   const dest = tool.getRange(DATA_START_ROW, 1, outVals.length, 3);
   dest.setValues(outVals);
@@ -120,6 +153,8 @@ function populateSelectedLevel(options) {
 
   try {
     return analyzeSelectedLevel({
+      tierName,
+      levelName,
       outputAlreadyCleared: true,
       values: outVals,
       backgrounds: outBgs,
@@ -129,4 +164,18 @@ function populateSelectedLevel(options) {
     setAnalysisStatusMessage_(tool, "Failed to analyze opinions", "#fce8e6");
     return false;
   }
+}
+
+function selectedLevelStillCurrent_(tool, tierName, levelName) {
+  if (!tool) return false;
+  const currentTierName = String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim();
+  const currentLevelName = String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim();
+  return currentTierName === tierName && currentLevelName === levelName;
+}
+
+function failSelectedLevelLoad_(tool, tierName, levelName, message, background) {
+  if (!selectedLevelStillCurrent_(tool, tierName, levelName)) return false;
+  clearAnalysisArea_(tool);
+  setAnalysisStatusMessage_(tool, message, background);
+  return false;
 }
