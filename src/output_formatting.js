@@ -502,34 +502,31 @@ function renderAnalysisStatus_(tool) {
   const tierName = String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim();
   const levelName = String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim();
 
-  // Check opinions directly from A:C
-  const vals = tool
-    .getRange(DATA_START_ROW, 1, tool.getMaxRows() - DATA_START_ROW + 1, 3)
-    .getDisplayValues();
+  if (!tierName) {
+    setAnalysisStatusMessage_(tool, "Select a tier sheet", "#fce8e6");
+    return;
+  }
+  if (!levelName) {
+    setAnalysisStatusMessage_(tool, "Select a level", "#fff4cc");
+    return;
+  }
 
   let hasOpinions = false;
-
-  for (const r of vals) {
-    if (String(r[0]).trim() || String(r[1]).trim() || String(r[2]).trim()) {
-      hasOpinions = true;
-      break;
+  const lastDataRow = getLevelLastRow_(tool, 1, 3);
+  const rowCount = Math.max(0, lastDataRow - DATA_START_ROW + 1);
+  if (rowCount > 0) {
+    const vals = tool.getRange(DATA_START_ROW, 1, rowCount, 3).getDisplayValues();
+    for (const r of vals) {
+      if (String(r[0]).trim() || String(r[1]).trim() || String(r[2]).trim()) {
+        hasOpinions = true;
+        break;
+      }
     }
   }
 
-  let message = "";
-  let bg = "#fce8e6";
-
-  if (!tierName) {
-    message = "Select a tier sheet";
-  } else if (!levelName) {
-    message = "Select a level";
-    bg = "#fff4cc";
-  } else if (!hasOpinions) {
-    message = "No opinions loaded";
-  } else {
-    message = "Loading..";
-    bg = "#e8f0fe";
-  }
-
-  setAnalysisStatusMessage_(tool, message, bg);
+  setAnalysisStatusMessage_(
+    tool,
+    hasOpinions ? "Loading.." : "No opinions loaded",
+    hasOpinions ? "#e8f0fe" : "#fce8e6"
+  );
 }
