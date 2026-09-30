@@ -178,11 +178,11 @@ function setWeightedDistributionFormulas_(
     1
   );
   const formulas = names.map(name => {
-    if ((weightsByName[name] || 0) <= 0) return [""];
     const color = colorsByName[name] || "#999999";
     return [
-      `=SPARKLINE({(RC[-1]/MAX(R${firstDataRow}C[-1]:R${lastDataRow}C[-1]))*${confidenceScale},1},` +
-      `{"charttype","bar";"color1","${color}";"color2","white";"max",1})`
+      `=IF(RC[-2]<=0,"",SPARKLINE(` +
+      `{(RC[-1]/MAX(R${firstDataRow}C[-1]:R${lastDataRow}C[-1]))*${confidenceScale},1},` +
+      `{"charttype","bar";"color1","${color}";"color2","white";"max",1}))`
     ];
   });
 
