@@ -132,6 +132,24 @@ function analyzeSelectedLevel(options) {
     moveFailureReason
   } = analysis;
   const reliabilityDistribution = buildReliabilityDistribution_(bgs, countedRowFlags);
+  const placeMoveFailure = canMove ? null : resolvePlaceMoveFailure_({
+    isPending,
+    passesMajority,
+    passesSplitMajority,
+    verdictDiffersFromCurrent,
+    fuckPresent,
+    sd,
+    toppct,
+    fuckpct,
+    minimumOpinionWeight,
+    rawOpinionCount: rawCount,
+    lockSharePct,
+    totalWeightedOpinions: allWeight,
+    passesSplitPct,
+    verdictBaseName,
+    placementComparison,
+    moveFailureReason
+  });
 
   const out = [];
   out.push([`Tier sheet`, tierName, "", ""]);
@@ -149,7 +167,12 @@ function analyzeSelectedLevel(options) {
     ""
   ]);
   out.push([`Standard Deviation`, sd, "", ""]);
-  out.push([`Place/Move`, canMove ? "YES" : "NO", "", canMove ? verdictTierName : ""]);
+  out.push([
+    `Place/Move`,
+    canMove ? "YES" : "NO",
+    placeMoveFailure ? placeMoveFailure.text : "",
+    canMove ? verdictTierName : ""
+  ]);
 
   function upTo3dec_(x) {
     return Number(x).toFixed(3).replace(/\.?0+$/, "");
@@ -211,31 +234,13 @@ function analyzeSelectedLevel(options) {
     distributionTierNames,
     weightsByTier,
     topTier,
-    topWeight,
     secondTier,
     placementComparison,
-    passesMajority,
-    passesSplitMajority,
-    verdictDiffersFromCurrent,
-    isPending,
-    fuckPresent,
-    sd,
-    fuckWeight,
-    toppct,
     fuckpct,
-    allWeight,
     currentTier,
     canMove,
-    verdictTier,
-    verdictTierName,
-    verdictBaseName,
-    minimumOpinionWeight,
-    rawCount,
-    lockSharePct,
     allWeight,
-    passesSplitPct,
-    splitThreshold,
-    moveFailureReason,
+    placeMoveFailure,
     reliabilityDistribution,
     out.map(row => row[0])
   );

@@ -1,17 +1,3 @@
-function applyTierSheetColor_(tool, row, valueCol, tierName) {
-  tierName = String(tierName || "").trim();
-  if (!tierName) return;
-
-  const nameToColor = buildTierNameToColor_();
-  const hex = nameToColor[tierName];
-  if (!hex) return; // if sheet name isn't a tier name, skip
-
-  tool.getRange(row, valueCol)
-    .setBackground(hex)
-    .setFontColor(tierTextColor_(tierName))
-    .setFontWeight("bold");
-}
-
 function applyCountedPlayerHighlights_(tool, startRow, sourceBackgrounds, countedRowFlags, sourceValues) {
   if (!sourceBackgrounds || sourceBackgrounds.length === 0) return;
 
@@ -111,105 +97,125 @@ function resolvePlaceMoveFailure_(ctx) {
   }
 }
 
+function createFormatMatrix_(rowCount, value) {
+  return Array.from({ length: rowCount }, () => Array(OUTPUT_WIDTH).fill(value));
+}
+
+function createAnalysisStylePlan_(rowCount) {
+  return {
+    backgrounds: createFormatMatrix_(rowCount, null),
+    fontColors: createFormatMatrix_(rowCount, "#000000"),
+    fontWeights: createFormatMatrix_(rowCount, "normal"),
+    fontStyles: createFormatMatrix_(rowCount, "normal"),
+    fontLines: createFormatMatrix_(rowCount, "none"),
+    fontSizes: createFormatMatrix_(rowCount, 10),
+    horizontalAlignments: createFormatMatrix_(rowCount, null),
+    verticalAlignments: createFormatMatrix_(rowCount, null)
+  };
+}
+
+function fillFormatRow_(matrix, row, value) {
+  if (row < 0 || row >= matrix.length) return;
+  matrix[row].fill(value);
+}
+
+function fillFormatSpan_(matrix, row, startCol, width, value) {
+  if (row < 0 || row >= matrix.length) return;
+  for (let col = startCol; col < startCol + width; col++) {
+    matrix[row][col] = value;
+  }
+}
+
+function addWeightedDistributionStyles_(
+  styles,
+  headerIndex,
+  names,
+  weightsByName,
+  colorsByName
+) {
+  fillFormatRow_(styles.backgrounds, headerIndex, "#eeeeee");
+  fillFormatRow_(styles.fontWeights, headerIndex, "bold");
+
+  names.forEach((name, index) => {
+    const row = headerIndex + index + 1;
+    const weight = weightsByName[name] || 0;
+    const isPositive = weight > 0;
+
+    styles.backgrounds[row][0] = isPositive ? colorsByName[name] || "#999999" : null;
+    fillFormatRow_(styles.fontColors, row, isPositive ? "#000000" : "#9e9e9e");
+    styles.fontColors[row][0] = isPositive ? tierTextColor_(name) : "#9e9e9e";
+    styles.fontWeights[row][0] = "bold";
+  });
+}
+
+function applyAnalysisStylePlan_(tool, startRow, startCol, styles) {
+  tool.getRange(startRow, startCol, styles.backgrounds.length, OUTPUT_WIDTH)
+    .setBackgrounds(styles.backgrounds)
+    .setFontColors(styles.fontColors)
+    .setFontWeights(styles.fontWeights)
+    .setFontStyles(styles.fontStyles)
+    .setFontLines(styles.fontLines)
+    .setFontSizes(styles.fontSizes)
+    .setHorizontalAlignments(styles.horizontalAlignments)
+    .setVerticalAlignments(styles.verticalAlignments);
+}
+
+function setWeightedDistributionFormulas_(
+  tool,
+  headerRow,
+  startCol,
+  names,
+  weightsByName,
+  colorsByName,
+  totalWeightedOpinions
+) {
+  if (names.length === 0) return;
+
+  const firstDataRow = headerRow + 1;
+  const lastDataRow = firstDataRow + names.length - 1;
+  const confidenceScale = Math.min(
+    0.2 + 0.8 * (totalWeightedOpinions / 45),
+    1
+  );
+  const formulas = names.map(name => {
+    if ((weightsByName[name] || 0) <= 0) return [""];
+    const color = colorsByName[name] || "#999999";
+    return [
+      `=SPARKLINE({(RC[-1]/MAX(R${firstDataRow}C[-1]:R${lastDataRow}C[-1]))*${confidenceScale},1},` +
+      `{"charttype","bar";"color1","${color}";"color2","white";"max",1})`
+    ];
+  });
+
+  tool.getRange(firstDataRow, startCol + 3, names.length, 1)
+    .setFormulasR1C1(formulas);
+}
+
 function formatAnalysisOutput_(
   tool,
   outRowCount,
   distributionTierNames,
   weightsByTier,
   topTier,
-  topWeight,
   runnerTier,
   placementComparison,
-  passesMajority,
-  passesSplitMajority,
-  verdictDiffersFromCurrent,
-  isPending,
-  fuckPresent,
-  sd,
-  fuckWeight,
-  toppct,
   fuckpct,
-  allWeight,
   currentTier,
   canMove,
-  verdictTier,
-  verdictTierName,
-  verdictBaseName,
-  minimumOpinionWeight,
-  rawOpinionCount,
-  lockSharePct,
   totalWeightedOpinions,
-  passesSplitPct,
-  splitThreshold,
-  moveFailureReason,
+  placeMoveFailure,
   reliabilityDistribution,
   labels
 ) {
   const r0 = OUTPUT_START_ROW;
   const c0 = OUTPUT_COL;
-
-  // Reset styling first (important)
-  tool.getRange(r0, c0, outRowCount, OUTPUT_WIDTH)
-    .setBackground(null)
-    .setFontWeight("normal")
-    .setFontColor("#000000");
-
-  // Labels column
-  tool.getRange(r0, c0, outRowCount, 1)
-    .setFontWeight("bold");
-
-  // Right-align numbers
-  tool.getRange(r0, c0 + 2, outRowCount, 2)
-    .setHorizontalAlignment("right");
-
-  // Center header & increase font size
-  tool.getRange(r0, c0, 2, 2)
-    .setHorizontalAlignment("center")
-    .setFontSize(11);
-
   const meetsRow = labels.findIndex(v => v === "Place/Move");
   const splitRow = labels.findIndex(v => v === "Split");
   const signalHeader = labels.findIndex(v => String(v).trim() === "Fuck % of all");
   const distHeader = labels.findIndex(v => String(v).trim() === "Tier");
   const reliabilityHeader = labels.findIndex(v => String(v).trim() === "Reliability");
 
-  // Header rows
   const tierRow = labels.findIndex(v => String(v).trim() === "Tier sheet");
   const levelRow = labels.findIndex(v => String(v).trim() === "Level");
-
-  if (tierRow >= 0) applyTierSheetColor_(tool, r0 + tierRow, c0 + 1, currentTier);
-
-  // Tier Header formatting
-  if (tierRow >= 0) {
-    const r = r0 + tierRow;
-    const badge = tool.getRange(r, c0 + 1, 1, 3); // F:H
-    if (!badge.isPartOfMerge()) badge.mergeAcross();
-    badge
-      .setHorizontalAlignment("center")
-      .setFontWeight("bold")
-      .setBorder(true, true, true, true, false, false, "#dadce0", SpreadsheetApp.BorderStyle.SOLID);
-    tool.getRange(r, c0).setBackground(null); // keep label cell neutral
-
-    const versionCell = tool.getRange(r + 2, c0 + 3, 1, 1); // H
-    versionCell
-      .setFontSize(10)
-      .setFontColor("#9e9e9e")
-      .setFontWeight("normal")
-      .setHorizontalAlignment("right")
-      .setVerticalAlignment("middle");
-  }
-
-  // Level Header formatting
-  if (levelRow >= 0) {
-    const r = r0 + levelRow;
-    const pill = tool.getRange(r, c0 + 1, 1, 3); // F:H
-    if (!pill.isPartOfMerge()) pill.mergeAcross();
-    pill
-      .setBackground("#f3f3f3")
-      .setHorizontalAlignment("center")
-      .setFontWeight("bold")
-      .setBorder(true, true, true, true, false, false, "#dadce0", SpreadsheetApp.BorderStyle.SOLID);
-  }
 
   const idxTotal = labels.findIndex(v => String(v).trim() === "Total weighted opinions");
   const idxMost  = labels.findIndex(v => String(v).trim() === "Most votes (weighted)");
@@ -220,220 +226,217 @@ function formatAnalysisOutput_(
   const idxOutlierRange = labels.findIndex(v => String(v).trim() === "Outlier range");
   const idxSd = labels.findIndex(v => String(v).trim() === "Standard Deviation");
   const idxFuckSignal = labels.findIndex(v => String(v).trim() === "Fuck");
+  const styles = createAnalysisStylePlan_(outRowCount);
+  const nameToColor = buildTierNameToColor_();
 
-  const styleMetricRow = (r, bg) => {
-    tool.getRange(r, c0, 1, OUTPUT_WIDTH)
-      .setBackground(bg)
-
-    tool.getRange(r, c0 + 1).setHorizontalAlignment("left");  // tier/text (F)
-    tool.getRange(r, c0 + 2, 1, 2).setHorizontalAlignment("right"); // numbers (G:H)
-
-    tool.getRange(r, c0).setFontWeight("bold"); // label emphasis
-  };
-
-  if (idxTotal >= 0) {
-    const r = r0 + idxTotal;
-    styleMetricRow(r, "#ffffff");
-    tool.getRange(r, c0 + 1).setFontWeight("bold"); // the total value
+  for (let row = 0; row < outRowCount; row++) {
+    styles.fontWeights[row][0] = "bold";
+    styles.horizontalAlignments[row][2] = "right";
+    styles.horizontalAlignments[row][3] = "right";
+  }
+  for (let row = 0; row < Math.min(2, outRowCount); row++) {
+    fillFormatSpan_(styles.horizontalAlignments, row, 0, 2, "center");
+    fillFormatSpan_(styles.fontSizes, row, 0, 2, 11);
   }
 
-  if (idxMost >= 0) styleMetricRow(r0 + idxMost, "#ffffff");
-  if (idxRun  >= 0) styleMetricRow(r0 + idxRun,  "#ffffff");
+  if (tierRow >= 0) {
+    const tierColor = nameToColor[String(currentTier || "").trim()];
+    fillFormatSpan_(styles.horizontalAlignments, tierRow, 1, 3, "center");
+    fillFormatSpan_(styles.fontWeights, tierRow, 1, 3, "bold");
+    if (tierColor) {
+      fillFormatSpan_(styles.backgrounds, tierRow, 1, 3, tierColor);
+      fillFormatSpan_(styles.fontColors, tierRow, 1, 3, tierTextColor_(currentTier));
+    }
 
-  [idxMean, idxMedian, idxOutliers, idxOutlierRange, idxSd].forEach(idx => {
-    if (idx < 0) return;
+    const versionRow = tierRow + 2;
+    if (versionRow < outRowCount) {
+      styles.fontColors[versionRow][3] = "#9e9e9e";
+      styles.fontWeights[versionRow][3] = "normal";
+      styles.horizontalAlignments[versionRow][3] = "right";
+      styles.verticalAlignments[versionRow][3] = "middle";
+    }
+  }
 
-    tool.getRange(r0 + idx, c0, 1, OUTPUT_WIDTH)
-      .setBackground("#fafafa")
-      .setFontColor("#6f6f6f");
+  if (levelRow >= 0) {
+    fillFormatSpan_(styles.backgrounds, levelRow, 1, 3, "#f3f3f3");
+    fillFormatSpan_(styles.horizontalAlignments, levelRow, 1, 3, "center");
+    fillFormatSpan_(styles.fontWeights, levelRow, 1, 3, "bold");
+  }
 
-    tool.getRange(r0 + idx, c0)
-      .setFontWeight("normal");
+  [idxTotal, idxMost, idxRun].forEach(index => {
+    if (index < 0) return;
+    fillFormatRow_(styles.backgrounds, index, "#ffffff");
+    styles.horizontalAlignments[index][1] = "left";
   });
+  if (idxTotal >= 0) styles.fontWeights[idxTotal][1] = "bold";
 
-  tool.getRange(r0 + idxMost, c0 + 2)
-    .setNumberFormat("0.###")
-    .setHorizontalAlignment("left");
+  [idxMean, idxMedian, idxOutliers, idxOutlierRange, idxSd].forEach(index => {
+    if (index < 0) return;
+    fillFormatRow_(styles.backgrounds, index, "#fafafa");
+    fillFormatRow_(styles.fontColors, index, "#6f6f6f");
+    styles.fontWeights[index][0] = "normal";
+  });
+  [idxMost, idxRun, idxRun + 1, idxRun + 2].forEach(index => {
+    if (index >= 0 && index < outRowCount) styles.horizontalAlignments[index][2] = "left";
+  });
+  if (idxSd >= 0) styles.horizontalAlignments[idxSd][1] = "left";
 
-  tool.getRange(r0 + idxRun, c0 + 2)
-    .setNumberFormat("0.###")
-    .setHorizontalAlignment("left");
-
-  tool.getRange(r0 + idxRun + 1, c0 + 2)
-    .setNumberFormat("0.###")
-    .setHorizontalAlignment("left");
-
-  tool.getRange(r0 + idxRun + 2, c0 + 2)
-    .setNumberFormat("0.###")
-    .setHorizontalAlignment("left");
-
-  tool.getRange(r0 + idxRun + 2, c0, 1, OUTPUT_WIDTH)
-    .setBorder(false, false, true, false, false, false, "#999999", SpreadsheetApp.BorderStyle.DOTTED);
-
-  // Verdict emphasis
   if (meetsRow >= 0) {
-    const r = r0 + meetsRow;
-    const val = canMove ? "YES" : "NO";
-    const msgRange = tool.getRange(r, c0 + 2, 1, 2);
-    const msgCell = tool.getRange(r, c0 + 2);
-
-    tool.getRange(r, c0, 1, OUTPUT_WIDTH)
-      .setBackground(val === "YES" ? "#e6f4ea" : "#fce8e6");
-
-    if (val === "YES") {
-      tool.getRange(r, c0 + 2, 1, 2).breakApart();
-      const verdictCell = tool.getRange(r, c0 + 3);
-      verdictCell
-        .setHorizontalAlignment("center")
-        .setFontWeight("bold");
-    }
-
-    tool.getRange(r, c0 + 1).setFontWeight("bold");
-
-    if (val !== "YES") {
-      if (!msgRange.isPartOfMerge()) msgRange.mergeAcross();
-      msgCell
-        .setValue("")
-        .setFontWeight("bold");
-
-      const failure = resolvePlaceMoveFailure_({
-        isPending,
-        passesMajority,
-        passesSplitMajority,
-        verdictDiffersFromCurrent,
-        fuckPresent,
-        sd,
-        toppct,
-        fuckpct,
-        minimumOpinionWeight,
-        rawOpinionCount,
-        lockSharePct,
-        totalWeightedOpinions,
-        passesSplitPct,
-        verdictBaseName,
-        placementComparison,
-        moveFailureReason
-      });
-
-      msgCell.setValue(failure.text);
-      if (failure.bg) {
-        tool.getRange(r, c0, 1, OUTPUT_WIDTH).setBackground(failure.bg);
-      }
+    const failureBackground = placeMoveFailure && placeMoveFailure.bg
+      ? placeMoveFailure.bg
+      : "#fce8e6";
+    fillFormatRow_(
+      styles.backgrounds,
+      meetsRow,
+      canMove ? "#e6f4ea" : failureBackground
+    );
+    styles.fontWeights[meetsRow][1] = "bold";
+    if (canMove) {
+      styles.horizontalAlignments[meetsRow][3] = "center";
+      styles.fontWeights[meetsRow][3] = "bold";
+    } else {
+      styles.fontWeights[meetsRow][2] = "bold";
     }
   }
 
-  // Split emphasis
   if (splitRow >= 0) {
-    const r = r0 + splitRow;
-    const nameToColor = buildTierNameToColor_();
+    fillFormatRow_(styles.backgrounds, splitRow, "#fff4cc");
+    fillFormatRow_(styles.verticalAlignments, splitRow, "middle");
 
-    tool.getRange(r, c0, 1, OUTPUT_WIDTH)
-      .setBackground("#fff4cc")
-      .setVerticalAlignment("middle");
-
-    if (nameToColor[placementComparison.left.label]) {
-      tool.getRange(r, c0 + 1)
-        .setBackground(nameToColor[placementComparison.left.label])
-        .setFontColor(tierTextColor_(placementComparison.left.label))
-        .setHorizontalAlignment("right")
-        .setVerticalAlignment("middle");
+    const leftName = placementComparison.left.label;
+    if (nameToColor[leftName]) {
+      styles.backgrounds[splitRow][1] = nameToColor[leftName];
+      styles.fontColors[splitRow][1] = tierTextColor_(leftName);
+      styles.horizontalAlignments[splitRow][1] = "right";
     }
 
-    if (nameToColor[placementComparison.right.label]) {
-      tool.getRange(r, c0 + 2)
-        .setBackground(nameToColor[placementComparison.right.label])
-        .setFontColor(tierTextColor_(placementComparison.right.label))
-        .setHorizontalAlignment("left")
-        .setVerticalAlignment("middle");
+    const rightName = placementComparison.right.label;
+    if (nameToColor[rightName]) {
+      styles.backgrounds[splitRow][2] = nameToColor[rightName];
+      styles.fontColors[splitRow][2] = tierTextColor_(rightName);
+      styles.horizontalAlignments[splitRow][2] = "left";
     }
 
-    tool.getRange(r, c0 + 3)
-      .setFontSize(11)
-      .setFontWeight("bold")
-      .setNumberFormat("0.###")
-      .setHorizontalAlignment("center")
-      .setVerticalAlignment("middle");
+    styles.fontSizes[splitRow][3] = 11;
+    styles.fontWeights[splitRow][3] = "bold";
+    styles.horizontalAlignments[splitRow][3] = "center";
   }
 
   if (signalHeader >= 0) {
-    const signalHeaderRow = r0 + signalHeader;
-    tool.getRange(signalHeaderRow, c0, 1, OUTPUT_WIDTH)
-      .setBackground("#f1f3f4")
-      .setFontWeight("bold")
-      .setFontColor("#5f6368")
-      .setBorder(true, false, true, false, false, false, "#d6d9dc", SpreadsheetApp.BorderStyle.SOLID);
+    fillFormatRow_(styles.backgrounds, signalHeader, "#f1f3f4");
+    fillFormatRow_(styles.fontWeights, signalHeader, "bold");
+    fillFormatRow_(styles.fontColors, signalHeader, "#5f6368");
   }
 
-  // Distribution table
   if (distHeader >= 0) {
-    const headerRow = r0 + distHeader;
-    const nameToColor = buildTierNameToColor_();
-    const firstData = formatWeightedDistribution_(
+    addWeightedDistributionStyles_(
+      styles,
+      distHeader,
+      distributionTierNames,
+      weightsByTier,
+      nameToColor
+    );
+
+    const firstDataIndex = distHeader + 1;
+    const topIndex = distributionTierNames.indexOf(topTier);
+    const runnerIndex = distributionTierNames.indexOf(runnerTier);
+    if (topIndex >= 0) {
+      fillFormatRow_(styles.fontWeights, firstDataIndex + topIndex, "bold");
+      fillFormatRow_(styles.fontLines, firstDataIndex + topIndex, "underline");
+    }
+    if (runnerIndex >= 0) {
+      fillFormatRow_(styles.fontStyles, firstDataIndex + runnerIndex, "italic");
+    }
+  }
+
+  const reliabilityColors = {};
+  for (const level of reliabilityDistributionLevels) {
+    reliabilityColors[level.name] = level.color;
+  }
+  if (reliabilityHeader >= 0 && reliabilityDistribution.names.length > 0) {
+    addWeightedDistributionStyles_(
+      styles,
+      reliabilityHeader,
+      reliabilityDistribution.names,
+      reliabilityDistribution.counts,
+      reliabilityColors
+    );
+  }
+
+  if (idxFuckSignal >= 0) {
+    const fuckIsBackground = fuckpct < 0.15;
+    fillFormatRow_(styles.backgrounds, idxFuckSignal, "#f5f5f5");
+    styles.backgrounds[idxFuckSignal][0] = fuckIsBackground ? "#d9d9d9" : "#000000";
+    styles.fontColors[idxFuckSignal][0] = fuckIsBackground ? "#7a7a7a" : "#ff0000";
+    styles.fontWeights[idxFuckSignal][0] = fuckIsBackground ? "normal" : "bold";
+    styles.fontColors[idxFuckSignal][1] = fuckIsBackground ? "#8a8a8a" : "#000000";
+    styles.fontWeights[idxFuckSignal][1] = fuckIsBackground ? "normal" : "bold";
+    styles.fontColors[idxFuckSignal][2] = fuckIsBackground ? "#8a8a8a" : "#b71c1c";
+    styles.fontWeights[idxFuckSignal][2] = fuckIsBackground ? "normal" : "bold";
+    styles.horizontalAlignments[idxFuckSignal][1] = "right";
+    styles.horizontalAlignments[idxFuckSignal][2] = "right";
+  }
+
+  if (tierRow >= 0) tool.getRange(r0 + tierRow, c0 + 1, 1, 3).breakApart();
+  if (levelRow >= 0) tool.getRange(r0 + levelRow, c0 + 1, 1, 3).breakApart();
+  if (meetsRow >= 0) tool.getRange(r0 + meetsRow, c0 + 2, 1, 2).breakApart();
+
+  applyAnalysisStylePlan_(tool, r0, c0, styles);
+
+  if (tierRow >= 0) {
+    tool.getRange(r0 + tierRow, c0 + 1, 1, 3)
+      .mergeAcross()
+      .setBorder(true, true, true, true, false, false, "#dadce0", SpreadsheetApp.BorderStyle.SOLID);
+  }
+  if (levelRow >= 0) {
+    tool.getRange(r0 + levelRow, c0 + 1, 1, 3)
+      .mergeAcross()
+      .setBorder(true, true, true, true, false, false, "#dadce0", SpreadsheetApp.BorderStyle.SOLID);
+  }
+  if (idxRun >= 0 && idxRun + 2 < outRowCount) {
+    tool.getRange(r0 + idxRun + 2, c0, 1, OUTPUT_WIDTH)
+      .setBorder(false, false, true, false, false, false, "#999999", SpreadsheetApp.BorderStyle.DOTTED);
+  }
+  if (meetsRow >= 0 && !canMove) {
+    tool.getRange(r0 + meetsRow, c0 + 2, 1, 2).mergeAcross();
+  }
+  if (signalHeader >= 0) {
+    tool.getRange(r0 + signalHeader, c0, 1, OUTPUT_WIDTH)
+      .setBorder(true, false, true, false, false, false, "#d6d9dc", SpreadsheetApp.BorderStyle.SOLID);
+  }
+  if (idxFuckSignal >= 0) {
+    const fuckIsBackground = fuckpct < 0.15;
+    tool.getRange(r0 + idxFuckSignal, c0, 1, OUTPUT_WIDTH)
+      .setBorder(true, false, true, false, false, false, "#d0d0d0", SpreadsheetApp.BorderStyle.DASHED);
+    tool.getRange(r0 + idxFuckSignal, c0 + 3).setFormulaR1C1(
+      `=SPARKLINE({RC[-1],1-RC[-1]},` +
+      `{"charttype","bar";"color1","${fuckIsBackground ? "#9e9e9e" : "#000000"}";"color2","#f5f5f5";"max",1})`
+    );
+    tool.getRange(r0 + idxFuckSignal, c0 + 1).setNumberFormat("0.00");
+    tool.getRange(r0 + idxFuckSignal, c0 + 2).setNumberFormat("0.0%");
+  }
+  if (splitRow >= 0) {
+    tool.getRange(r0 + splitRow, c0 + 3).setNumberFormat("0.###");
+  }
+  [idxMost, idxRun, idxRun + 1, idxRun + 2].forEach(index => {
+    if (index >= 0 && index < outRowCount) {
+      tool.getRange(r0 + index, c0 + 2).setNumberFormat("0.###");
+    }
+  });
+
+  if (distHeader >= 0) {
+    setWeightedDistributionFormulas_(
       tool,
-      headerRow,
+      r0 + distHeader,
       c0,
       distributionTierNames,
       weightsByTier,
       nameToColor,
       totalWeightedOpinions
     );
-
-    if (idxFuckSignal >= 0) {
-      const fuckRow = r0 + idxFuckSignal;
-      const sparkCol = c0 + 3; // H
-      const sparkCell = tool.getRange(fuckRow, sparkCol);
-      const fuckIsBackground = fuckpct < 0.15;
-
-      tool.getRange(fuckRow, c0, 1, OUTPUT_WIDTH)
-        .setBackground("#f5f5f5")
-        .setBorder(true, false, true, false, false, false, "#d0d0d0", SpreadsheetApp.BorderStyle.DASHED);
-
-      tool.getRange(fuckRow, c0)
-        .setBackground(fuckIsBackground ? "#d9d9d9" : "#000000")
-        .setFontColor(fuckIsBackground ? "#7a7a7a" : "#ff0000")
-        .setFontWeight(fuckIsBackground ? "normal" : "bold");
-
-      tool.getRange(fuckRow, c0 + 1)
-        .setFontWeight(fuckIsBackground ? "normal" : "bold")
-        .setFontColor(fuckIsBackground ? "#8a8a8a" : "#000000")
-        .setHorizontalAlignment("right");
-
-      tool.getRange(fuckRow, c0 + 2)
-        .setFontWeight(fuckIsBackground ? "normal" : "bold")
-        .setFontColor(fuckIsBackground ? "#8a8a8a" : "#b71c1c")
-        .setHorizontalAlignment("right");
-
-      sparkCell
-        .setBackground("#f5f5f5");
-
-      sparkCell.setFormulaR1C1(
-        `=SPARKLINE({RC[-1],1-RC[-1]},` +
-        `{"charttype","bar";"color1","${fuckIsBackground ? "#9e9e9e" : "#000000"}";"color2","#f5f5f5";"max",1})`
-      );
-    }
-
-    // Emphasize top + runner only
-    const tIdx = distributionTierNames.indexOf(topTier);
-    const rIdx = distributionTierNames.indexOf(runnerTier);
-
-    if (tIdx >= 0) {
-      tool.getRange(firstData + tIdx, c0, 1, OUTPUT_WIDTH)
-        .setFontWeight("bold")
-        .setFontLine("underline");
-    }
-    if (rIdx >= 0) {
-      tool.getRange(firstData + rIdx, c0, 1, OUTPUT_WIDTH)
-        .setFontStyle("italic");
-    }
   }
-
   if (reliabilityHeader >= 0 && reliabilityDistribution.names.length > 0) {
-    const reliabilityColors = {};
-    for (const level of reliabilityDistributionLevels) {
-      reliabilityColors[level.name] = level.color;
-    }
-
-    formatWeightedDistribution_(
+    setWeightedDistributionFormulas_(
       tool,
       r0 + reliabilityHeader,
       c0,
@@ -443,104 +446,6 @@ function formatAnalysisOutput_(
       reliabilityDistribution.totalCount
     );
   }
-
-  if (idxFuckSignal >= 0) {
-    tool.getRange(r0 + idxFuckSignal, c0 + 1, 1, 1)
-      .setHorizontalAlignment("right")
-      .setNumberFormat("0.00");
-    tool.getRange(r0 + idxFuckSignal, c0 + 2, 1, 1)
-      .setNumberFormat("0.0%")
-      .setHorizontalAlignment("right");
-  }
-}
-
-function formatWeightedDistribution_(
-  tool,
-  headerRow,
-  startCol,
-  names,
-  weightsByName,
-  colorsByName,
-  totalWeightedOpinions
-) {
-  const firstDataRow = headerRow + 1;
-  const lastDataRow = firstDataRow + names.length - 1;
-
-  tool.getRange(headerRow, startCol, 1, OUTPUT_WIDTH)
-    .setBackground("#eeeeee")
-    .setFontWeight("bold");
-
-  if (names.length === 0) return firstDataRow;
-
-  const fullWidthAt = 45;
-  const minScale = 0.2;
-  const confidenceScale = Math.min(
-    minScale + (1 - minScale) * (totalWeightedOpinions / fullWidthAt),
-    1
-  );
-  const dataRange = tool.getRange(firstDataRow, startCol, names.length, OUTPUT_WIDTH);
-  const canBatch =
-    typeof dataRange.setBackgrounds === "function" &&
-    typeof dataRange.setFontColors === "function" &&
-    typeof dataRange.setFontWeights === "function";
-
-  if (canBatch) {
-    const backgrounds = [];
-    const fontColors = [];
-    const fontWeights = [];
-
-    for (const name of names) {
-      const weight = weightsByName[name] || 0;
-      const color = colorsByName[name] || "#999999";
-      const isPositive = weight > 0;
-      backgrounds.push([isPositive ? color : null, null, null, null]);
-      fontColors.push(isPositive
-        ? [tierTextColor_(name), "#000000", "#000000", "#000000"]
-        : ["#9e9e9e", "#9e9e9e", "#9e9e9e", "#9e9e9e"]);
-      fontWeights.push(["bold", "normal", "normal", "normal"]);
-    }
-
-    dataRange
-      .setBackgrounds(backgrounds)
-      .setFontColors(fontColors)
-      .setFontWeights(fontWeights);
-
-    for (let i = 0; i < names.length; i++) {
-      const name = names[i];
-      if ((weightsByName[name] || 0) <= 0) continue;
-      const color = colorsByName[name] || "#999999";
-      tool.getRange(firstDataRow + i, startCol + 3).setFormulaR1C1(
-        `=SPARKLINE({(RC[-1]/MAX(R${firstDataRow}C[-1]:R${lastDataRow}C[-1]))*${confidenceScale},1},` +
-        `{"charttype","bar";"color1","${color}";"color2","white";"max",1})`
-      );
-    }
-    return firstDataRow;
-  }
-
-  for (let i = 0; i < names.length; i++) {
-    const row = firstDataRow + i;
-    const name = names[i];
-    const weight = weightsByName[name] || 0;
-
-    if (weight === 0) {
-      tool.getRange(row, startCol, 1, OUTPUT_WIDTH)
-        .setFontColor("#9e9e9e");
-      continue;
-    }
-
-    const color = colorsByName[name] || "#999999";
-    tool.getRange(row, startCol)
-      .setBackground(color)
-      .setFontWeight("bold")
-      .setFontColor(tierTextColor_(name));
-
-    tool.getRange(row, startCol + 3).setFormulaR1C1(
-      `=SPARKLINE({(RC[-1]/MAX(R${firstDataRow}C[-1]:R${lastDataRow}C[-1]))*${confidenceScale},1},` +
-      `{"charttype","bar";"color1","${color}";"color2","white";"max",1})`
-    );
-  }
-
-  return firstDataRow;
 }
 
 function setAnalysisStatusMessage_(tool, message, bg) {
