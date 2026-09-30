@@ -3,9 +3,19 @@ function onEdit(e) {
   if (!e) return;
   const range = e.range;
   const sh = range.getSheet();
+  const editedFirstRow = typeof range.getRow === "function" &&
+    range.getRow() <= 1 &&
+    range.getRow() + (typeof range.getNumRows === "function" ? range.getNumRows() : 1) - 1 >= 1;
+  if (editedFirstRow && typeof invalidateLevelHeaderCache_ === "function") {
+    invalidateLevelHeaderCache_(sh);
+  }
   if (sh.getName() === TIER_CONFIG_SHEET_NAME) {
-    tierConfigurationLoaded_ = false;
-    tierConfigurationResult_ = null;
+    if (typeof invalidateTierConfigurationCache_ === "function") {
+      invalidateTierConfigurationCache_();
+    } else {
+      tierConfigurationLoaded_ = false;
+      tierConfigurationResult_ = null;
+    }
     refreshTierDropdown_();
     return;
   }
@@ -107,7 +117,8 @@ function refreshLevelDropdown_() {
   const tierSheet = ss.getSheetByName(tierName);
   if (!tierSheet) return;
 
-  const headers = getLevelHeaders_(tierSheet); // array of {name, col}
+  const headers = getLevelHeadersForSelection_(tierSheet)
+    .filter(header => typeof isLevelLocked_ !== "function" || !isLevelLocked_(tierSheet, header.col));
   const headerNames = headers.map(h => h.name);
 
   const dvLevel = SpreadsheetApp.newDataValidation()
@@ -178,6 +189,93 @@ function getLevelHeaders_(tierSheet, bodyValues) {
     out.push(h);
   }
   return out;
+}
+
+const LEVEL_HEADER_CACHE_SCHEMA = 1;
+const LEVEL_HEADER_CACHE_TTL_SECONDS = 21600;
+
+function getLevelHeaderCache_() {
+  if (typeof CacheService === "undefined" || !CacheService.getDocumentCache) return null;
+  try {
+    return CacheService.getDocumentCache();
+  } catch (error) {
+    return null;
+  }
+}
+
+function levelHeaderCacheKey_(tierSheet, lastColumn) {
+  let spreadsheetId = "active";
+  let sheetId = typeof tierSheet.getSheetId === "function" ? tierSheet.getSheetId() : tierSheet.getName();
+  try {
+    const parent = typeof tierSheet.getParent === "function" ? tierSheet.getParent() : null;
+    if (parent && typeof parent.getId === "function") spreadsheetId = parent.getId();
+    else if (typeof SpreadsheetApp !== "undefined" && SpreadsheetApp.getActive) {
+      const active = SpreadsheetApp.getActive();
+      if (active && typeof active.getId === "function") spreadsheetId = active.getId();
+    }
+  } catch (error) {}
+  return [
+    "analyzer:level-headers:v" + LEVEL_HEADER_CACHE_SCHEMA,
+    spreadsheetId,
+    sheetId,
+    lastColumn
+  ].join(":");
+}
+
+function parseCachedLevelHeaders_(serialized, lastColumn) {
+  if (!serialized) return null;
+  try {
+    const cached = JSON.parse(serialized);
+    if (cached.schema !== LEVEL_HEADER_CACHE_SCHEMA || cached.lastColumn !== lastColumn) return null;
+    if (!Array.isArray(cached.headers)) return null;
+    const seenNames = {};
+    for (const header of cached.headers) {
+      if (!header || typeof header.name !== "string" || !header.name.trim()) return null;
+      if (!Number.isInteger(header.col) || header.col < 1 || header.col > lastColumn) return null;
+      if (seenNames[header.name]) return null;
+      seenNames[header.name] = true;
+    }
+    return cached.headers;
+  } catch (error) {
+    return null;
+  }
+}
+
+function cacheLevelHeaders_(tierSheet, lastColumn, headers) {
+  const cache = getLevelHeaderCache_();
+  if (!cache) return;
+  try {
+    cache.put(levelHeaderCacheKey_(tierSheet, lastColumn), JSON.stringify({
+      schema: LEVEL_HEADER_CACHE_SCHEMA,
+      lastColumn,
+      headers
+    }), LEVEL_HEADER_CACHE_TTL_SECONDS);
+  } catch (error) {}
+}
+
+function getLevelHeadersForSelection_(tierSheet) {
+  const lastColumn = tierSheet.getLastColumn();
+  const cache = getLevelHeaderCache_();
+  if (cache) {
+    const key = levelHeaderCacheKey_(tierSheet, lastColumn);
+    let headers = null;
+    try { headers = parseCachedLevelHeaders_(cache.get(key), lastColumn); } catch (error) {}
+    if (headers) return headers;
+    try { cache.remove(key); } catch (error) {}
+  }
+
+  const headers = getLevelHeaders_(tierSheet);
+  cacheLevelHeaders_(tierSheet, lastColumn, headers);
+  return headers;
+}
+
+function invalidateLevelHeaderCache_(tierSheet) {
+  if (!tierSheet || typeof tierSheet.getLastColumn !== "function") return;
+  const cache = getLevelHeaderCache_();
+  if (!cache) return;
+  try {
+    cache.remove(levelHeaderCacheKey_(tierSheet, tierSheet.getLastColumn()));
+  } catch (error) {}
 }
 
 function isAlphabeticalSectionHeader_(headers, index) {

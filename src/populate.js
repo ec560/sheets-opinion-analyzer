@@ -39,19 +39,50 @@ function getLevelLastRow_(tierSheet, startCol, numCols) {
 }
 
 function populateSelectedLevel(options) {
+  const timer = typeof createAnalyzerPhaseTimer_ === "function"
+    ? createAnalyzerPhaseTimer_({ operation: "populate-selected-level" })
+    : null;
   const lock = typeof LockService !== "undefined" && LockService.getDocumentLock
     ? LockService.getDocumentLock()
     : null;
-  if (lock) lock.waitLock(30000);
-
+  const lockStartedAt = typeof startAnalyzerPhase_ === "function"
+    ? startAnalyzerPhase_(timer)
+    : Date.now();
+  let result = false;
+  let failedWithError = false;
+  let lockAcquired = false;
+  let lockPhaseEnded = false;
   try {
-    return populateSelectedLevelUnlocked_(options);
+    if (lock) {
+      lock.waitLock(30000);
+      lockAcquired = true;
+    }
+    if (typeof endAnalyzerPhase_ === "function") {
+      endAnalyzerPhase_(timer, "documentLockAcquisition", lockStartedAt);
+    }
+    lockPhaseEnded = true;
+    const preparedOptions = Object.assign({}, options || {}, { timing: timer });
+    result = populateSelectedLevelUnlocked_(preparedOptions);
+    return result;
+  } catch (error) {
+    failedWithError = true;
+    if (!lockPhaseEnded && typeof endAnalyzerPhase_ === "function") {
+      endAnalyzerPhase_(timer, "documentLockAcquisition", lockStartedAt);
+    }
+    throw error;
   } finally {
-    if (lock) lock.releaseLock();
+    try {
+      if (lockAcquired) lock.releaseLock();
+    } finally {
+      if (timer && typeof timer.finish === "function") {
+        timer.finish(failedWithError ? "error" : result ? "rendered" : "not-rendered");
+      }
+    }
   }
 }
 
 function populateSelectedLevelUnlocked_(options) {
+  const timer = options && options.timing;
   const ss = SpreadsheetApp.getActive();
   const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
   if (!tool) {
@@ -60,11 +91,30 @@ function populateSelectedLevelUnlocked_(options) {
   }
   if (!options || !options.skipTierDropdownRefresh) refreshTierDropdown_();
 
-  const tierName = String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim();
-  const levelName = String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim();
+  let phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+    ? startAnalyzerPhase_(timer)
+    : Date.now();
+  const selection = typeof readAnalyzerSelection_ === "function"
+    ? readAnalyzerSelection_(tool)
+    : {
+      tierName: String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim(),
+      levelName: String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim()
+    };
+  const tierName = selection.tierName;
+  const levelName = selection.levelName;
+  if (timer && typeof timer.setContext === "function") timer.setContext({ tierName, levelName });
 
   if (typeof loadTierConfiguration_ === "function") {
+    if (typeof endAnalyzerPhase_ === "function") {
+      endAnalyzerPhase_(timer, "selectorRead", phaseStartedAt);
+    }
+    phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+      ? startAnalyzerPhase_(timer)
+      : Date.now();
     const configResult = loadTierConfiguration_();
+    if (typeof endAnalyzerPhase_ === "function") {
+      endAnalyzerPhase_(timer, "tierConfigurationLoading", phaseStartedAt);
+    }
     if (!configResult.valid && !configResult.missing) {
       return failSelectedLevelLoad_(
         tool,
@@ -74,6 +124,8 @@ function populateSelectedLevelUnlocked_(options) {
         "#fce8e6"
       );
     }
+  } else if (typeof endAnalyzerPhase_ === "function") {
+    endAnalyzerPhase_(timer, "selectorRead", phaseStartedAt);
   }
 
   if (!tierName || !levelName) {
@@ -82,13 +134,31 @@ function populateSelectedLevelUnlocked_(options) {
     return false;
   }
 
+  phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+    ? startAnalyzerPhase_(timer)
+    : Date.now();
   const tierSheet = ss.getSheetByName(tierName);
   if (!tierSheet) {
+    if (typeof endAnalyzerPhase_ === "function") {
+      endAnalyzerPhase_(timer, "headerAndSelectedLevelLookup", phaseStartedAt);
+    }
     return failSelectedLevelLoad_(tool, tierName, levelName, "Failed to load opinions", "#fce8e6");
   }
 
-  const headers = getLevelHeaders_(tierSheet);
-  const header = headers.find(h => h.name === levelName);
+  let headers = typeof getLevelHeadersForSelection_ === "function"
+    ? getLevelHeadersForSelection_(tierSheet)
+    : getLevelHeaders_(tierSheet);
+  let header = headers.find(h => h.name === levelName);
+  if (header && !selectedLevelHeaderMatches_(tierSheet, header, levelName)) {
+    if (typeof invalidateLevelHeaderCache_ === "function") invalidateLevelHeaderCache_(tierSheet);
+    headers = typeof getLevelHeadersForSelection_ === "function"
+      ? getLevelHeadersForSelection_(tierSheet)
+      : getLevelHeaders_(tierSheet);
+    header = headers.find(h => h.name === levelName);
+  }
+  if (typeof endAnalyzerPhase_ === "function") {
+    endAnalyzerPhase_(timer, "headerAndSelectedLevelLookup", phaseStartedAt);
+  }
   if (!header) {
     return failSelectedLevelLoad_(tool, tierName, levelName, "Failed to load opinions", "#fce8e6");
   }
@@ -104,17 +174,29 @@ function populateSelectedLevelUnlocked_(options) {
       "#fff4cc"
     );
   }
+  phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+    ? startAnalyzerPhase_(timer)
+    : Date.now();
   const lastRow = getLevelLastRow_(tierSheet, startCol, numCols);
   const numRows = Math.max(0, lastRow - 1);
+  if (typeof endAnalyzerPhase_ === "function") {
+    endAnalyzerPhase_(timer, "levelBoundaryDiscovery", phaseStartedAt);
+  }
 
   if (numRows === 0) {
     return failSelectedLevelLoad_(tool, tierName, levelName, "Failed: no opinions found", "#fce8e6");
   }
 
+  phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+    ? startAnalyzerPhase_(timer)
+    : Date.now();
   const srcRange = tierSheet.getRange(2, startCol, numRows, numCols);
   const vals = srcRange.getValues();
   const bgs = srcRange.getBackgrounds();
   const fcs = srcRange.getFontColors();
+  if (typeof endAnalyzerPhase_ === "function") {
+    endAnalyzerPhase_(timer, "sourceValuesBackgroundsFontColorsReads", phaseStartedAt);
+  }
 
   // Filter blank rows (no player and no opinion and no reliability)
   const outVals = [];
@@ -139,26 +221,37 @@ function populateSelectedLevelUnlocked_(options) {
   if (outVals.length === 0) {
     return failSelectedLevelLoad_(tool, tierName, levelName, "Failed: no opinions found", "#fce8e6");
   }
+  if (timer && typeof timer.setContext === "function") {
+    timer.setContext({ opinionCount: outVals.length });
+  }
 
   if (!selectedLevelStillCurrent_(tool, tierName, levelName)) {
     return false;
   }
 
+  phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+    ? startAnalyzerPhase_(timer)
+    : Date.now();
   clearAnalysisArea_(tool);
 
   const dest = tool.getRange(DATA_START_ROW, 1, outVals.length, 3);
   dest.setValues(outVals);
   dest.setBackgrounds(outBgs);
   dest.setFontColors(outFcs);
+  if (typeof endAnalyzerPhase_ === "function") {
+    endAnalyzerPhase_(timer, "loadedOpinionsClearAndWrite", phaseStartedAt);
+  }
 
   try {
     return analyzeSelectedLevel({
       tierName,
       levelName,
+      configurationValidated: true,
       outputAlreadyCleared: true,
       values: outVals,
       backgrounds: outBgs,
-      fontColors: outFcs
+      fontColors: outFcs,
+      timing: timer
     }) !== false;
   } catch (e) {
     setAnalysisStatusMessage_(tool, "Failed to analyze opinions", "#fce8e6");
@@ -166,11 +259,27 @@ function populateSelectedLevelUnlocked_(options) {
   }
 }
 
+function selectedLevelHeaderMatches_(tierSheet, header, expectedName) {
+  if (!tierSheet || !header) return false;
+  try {
+    const actualName = String(tierSheet.getRange(1, header.col).getDisplayValue() || "").trim();
+    return actualName === expectedName;
+  } catch (error) {
+    // Lightweight callers that cannot expose a single-cell header read still
+    // receive the same discovery behavior as before caching was introduced.
+    return true;
+  }
+}
+
 function selectedLevelStillCurrent_(tool, tierName, levelName) {
   if (!tool) return false;
-  const currentTierName = String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim();
-  const currentLevelName = String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim();
-  return currentTierName === tierName && currentLevelName === levelName;
+  const selection = typeof readAnalyzerSelection_ === "function"
+    ? readAnalyzerSelection_(tool)
+    : {
+      tierName: String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim(),
+      levelName: String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim()
+    };
+  return selection.tierName === tierName && selection.levelName === levelName;
 }
 
 function failSelectedLevelLoad_(tool, tierName, levelName, message, background) {

@@ -1,5 +1,24 @@
 // Main analysis function that reads opinions, applies weights, calculates stats, and outputs results
 function analyzeSelectedLevel(options) {
+  const ownsTimer = !(options && options.timing);
+  const timer = options && options.timing ||
+    (typeof createAnalyzerPhaseTimer_ === "function"
+      ? createAnalyzerPhaseTimer_({ operation: "analyze-loaded-opinions" })
+      : null);
+  let timingOutcome = "not-rendered";
+  try {
+    const result = analyzeSelectedLevelWithTiming_(options, timer);
+    timingOutcome = result === true ? "rendered" : "not-rendered";
+    return result;
+  } catch (error) {
+    timingOutcome = "error";
+    throw error;
+  } finally {
+    if (ownsTimer && timer && typeof timer.finish === "function") timer.finish(timingOutcome);
+  }
+}
+
+function analyzeSelectedLevelWithTiming_(options, timer) {
   const ss = SpreadsheetApp.getActive();
   const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
   if (!tool) {
@@ -7,8 +26,27 @@ function analyzeSelectedLevel(options) {
     return false;
   }
 
-  const selectedTierName = String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim();
-  const selectedLevelName = String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim();
+  const preparedValues = options && options.values;
+  const preparedBackgrounds = options && options.backgrounds;
+  const preparedFontColors = options && options.fontColors;
+  const hasPreparedData =
+    Array.isArray(preparedValues) &&
+    Array.isArray(preparedBackgrounds) &&
+    Array.isArray(preparedFontColors) &&
+    preparedValues.length === preparedBackgrounds.length &&
+    preparedValues.length === preparedFontColors.length;
+  const hasValidatedPreparedContext = hasPreparedData &&
+    options && options.tierName != null && options.levelName != null;
+  const selected = hasValidatedPreparedContext
+    ? { tierName: String(options.tierName).trim(), levelName: String(options.levelName).trim() }
+    : typeof readAnalyzerSelection_ === "function"
+      ? readAnalyzerSelection_(tool)
+      : {
+        tierName: String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim(),
+        levelName: String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim()
+      };
+  const selectedTierName = selected.tierName;
+  const selectedLevelName = selected.levelName;
   const expectedTierName = options && options.tierName != null
     ? String(options.tierName).trim()
     : selectedTierName;
@@ -20,8 +58,19 @@ function analyzeSelectedLevel(options) {
     return false;
   }
 
-  if (typeof loadTierConfiguration_ === "function") {
+  if (timer && typeof timer.setContext === "function") {
+    timer.setContext({ tierName: expectedTierName, levelName: expectedLevelName });
+  }
+
+  if (typeof loadTierConfiguration_ === "function" &&
+      !(hasValidatedPreparedContext && options.configurationValidated)) {
+    const configStartedAt = typeof startAnalyzerPhase_ === "function"
+      ? startAnalyzerPhase_(timer)
+      : Date.now();
     const configResult = loadTierConfiguration_();
+    if (typeof endAnalyzerPhase_ === "function") {
+      endAnalyzerPhase_(timer, "tierConfigurationLoading", configStartedAt);
+    }
     const configError = tierConfigurationErrorMessage_(configResult);
     if (configError) {
       setAnalysisStatusMessage_(tool, "Error with Tier Configuration", "#fce8e6");
@@ -55,16 +104,6 @@ function analyzeSelectedLevel(options) {
     return false;
   }
 
-  const preparedValues = options && options.values;
-  const preparedBackgrounds = options && options.backgrounds;
-  const preparedFontColors = options && options.fontColors;
-  const hasPreparedData =
-    Array.isArray(preparedValues) &&
-    Array.isArray(preparedBackgrounds) &&
-    Array.isArray(preparedFontColors) &&
-    preparedValues.length === preparedBackgrounds.length &&
-    preparedValues.length === preparedFontColors.length;
-
   let vals;
   let bgs;
   let fcs;
@@ -86,8 +125,16 @@ function analyzeSelectedLevel(options) {
     fcs = rng.getFontColors();
   }
 
+  if (timer && typeof timer.setContext === "function") timer.setContext({ opinionCount: vals.length });
+  const analysisStartedAt = typeof startAnalyzerPhase_ === "function"
+    ? startAnalyzerPhase_(timer)
+    : Date.now();
   const analysis = calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs);
+  if (typeof endAnalyzerPhase_ === "function") {
+    endAnalyzerPhase_(timer, "inMemoryAnalysis", analysisStartedAt);
+  }
   if (analysis.rawCount === 0) {
+    if (!analysisSelectionStillCurrent_(tool, tierName, levelName)) return false;
     applyCountedPlayerHighlights_(tool, DATA_START_ROW, bgs, analysis.countedRowFlags, vals);
     setAnalysisStatusMessage_(tool, "No usable opinions", "#fce8e6");
     return false;
@@ -210,24 +257,26 @@ function analyzeSelectedLevel(options) {
     }
   }
 
-  const currentTierName = String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim();
-  const currentLevelName = String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim();
-  if (currentTierName !== tierName || currentLevelName !== levelName) {
+  if (!analysisSelectionStillCurrent_(tool, tierName, levelName)) {
     return false;
   }
 
   const startRow = 1;
   const startCol = OUTPUT_COL;
+  const valuesStartedAt = typeof startAnalyzerPhase_ === "function"
+    ? startAnalyzerPhase_(timer)
+    : Date.now();
   tool.getRange(startRow, startCol, out.length, OUTPUT_WIDTH).setValues(out);
+  if (typeof applyAnalysisNumberFormatPlan_ === "function") {
+    applyAnalysisNumberFormatPlan_(tool, startRow, startCol, out.length, out.map(row => row[0]));
+  }
+  if (typeof endAnalyzerPhase_ === "function") {
+    endAnalyzerPhase_(timer, "outputValuesAndNumberFormatsWrites", valuesStartedAt);
+  }
 
-  tool.getRange(startRow, startCol + 1, out.length, 1)
-    .setNumberFormat("0.###");
-
-  const sdRow = out.findIndex(r => r[0] === "Standard Deviation");
-  if (sdRow >= 0) tool.getRange(startRow + sdRow, startCol + 1).setNumberFormat("0.00").setHorizontalAlignment("left");
-
-  tool.getRange(startRow + 9, startCol + 2, Math.max(0, out.length - 9), 1).setNumberFormat("0.0%");
-
+  const formattingStartedAt = typeof startAnalyzerPhase_ === "function"
+    ? startAnalyzerPhase_(timer)
+    : Date.now();
   formatAnalysisOutput_(
     tool,
     out.length,
@@ -246,7 +295,20 @@ function analyzeSelectedLevel(options) {
   );
 
   applyCountedPlayerHighlights_(tool, DATA_START_ROW, bgs, countedRowFlags, vals);
+  if (typeof endAnalyzerPhase_ === "function") {
+    endAnalyzerPhase_(timer, "outputFormattingAndSparklineWrites", formattingStartedAt);
+  }
   return true;
+}
+
+function analysisSelectionStillCurrent_(tool, tierName, levelName) {
+  const selection = typeof readAnalyzerSelection_ === "function"
+    ? readAnalyzerSelection_(tool)
+    : {
+      tierName: String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim(),
+      levelName: String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim()
+    };
+  return selection.tierName === tierName && selection.levelName === levelName;
 }
 
 function getVisibleDistributionNames_(orderedNames, weightsByName) {
