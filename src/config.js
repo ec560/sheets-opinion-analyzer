@@ -3,13 +3,34 @@
 const ANALYSIS_SHEET_NAME = "Tier Analysis";
 const FLAG_SCAN_SHEET_NAME = "Tier Flags";
 const TIER_CONFIG_SHEET_NAME = "Tier Configuration";
-const VERSION = "v1.14.5-beta";
+const VERSION = "v1.14.5";
 const TIER_CELL = "B1";
 const LEVEL_CELL = "B2";
 const DATA_START_ROW = 4;                      // where A:C gets populated
 const OUTPUT_COL = 5;                          // column E for results 
 const OUTPUT_START_ROW = 1;
 const OUTPUT_WIDTH = 4;                        // E:H block
+
+function readAnalyzerSelection_(tool) {
+  if (!tool) return { tierName: "", levelName: "" };
+
+  // Google Sheets returns this as one rectangular read. The fallback keeps
+  // simple local mocks and legacy callers working without affecting Apps Script.
+  try {
+    const values = tool.getRange(TIER_CELL + ":" + LEVEL_CELL).getDisplayValues();
+    if (Array.isArray(values) && values.length >= 2) {
+      return {
+        tierName: String(values[0] && values[0][0] || "").trim(),
+        levelName: String(values[1] && values[1][0] || "").trim()
+      };
+    }
+  } catch (error) {}
+
+  return {
+    tierName: String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim(),
+    levelName: String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim()
+  };
+}
 
 const FLAG_LOW_OPINION_WEIGHT = 4;
 const FUCK_MIN_OPINION_COUNT = 3;

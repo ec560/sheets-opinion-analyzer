@@ -6,8 +6,98 @@ const TIER_CONFIG_START_ROW = 5;
 const TIER_CONFIG_LIST_COL = 1;
 const TIER_CONFIG_BOTTOM_CELL = "E5";
 const TIER_CONFIG_TOP_CELL = "E6";
+const TIER_CONFIG_CACHE_SCHEMA = 1;
+const TIER_CONFIG_CACHE_KEY = "analyzer:tier-configuration:v" + TIER_CONFIG_CACHE_SCHEMA;
+const TIER_CONFIG_CACHE_TTL_SECONDS = 21600;
 let tierConfigurationLoaded_ = false;
 let tierConfigurationResult_ = null;
+let tierConfigurationLoadSource_ = "not-loaded";
+let tierConfigurationCacheStatus_ = "not-checked";
+
+function getTierConfigurationCache_() {
+  if (typeof CacheService === "undefined" || !CacheService.getDocumentCache) return null;
+  try {
+    return CacheService.getDocumentCache();
+  } catch (error) {
+    return null;
+  }
+}
+
+function invalidateTierConfigurationCache_() {
+  tierConfigurationLoaded_ = false;
+  tierConfigurationResult_ = null;
+  const cache = getTierConfigurationCache_();
+  if (!cache) return;
+  try {
+    cache.remove(TIER_CONFIG_CACHE_KEY);
+  } catch (error) {}
+}
+
+function isCachedTierConfigurationValid_(cached) {
+  if (!cached || cached.schema !== TIER_CONFIG_CACHE_SCHEMA || !Array.isArray(cached.rows)) {
+    return false;
+  }
+  if (cached.rows.length < 2) return false;
+  return cached.rows.every((row, index) => {
+    return row &&
+      row.order === index + 1 &&
+      typeof row.name === "string" && row.name.trim() !== "" &&
+      isTierHexColor_(row.primaryColor) &&
+      (row.borderColor === "" || isTierHexColor_(row.borderColor)) &&
+      (row.fontColor === "" || isTierHexColor_(row.fontColor)) &&
+      (row.splitFontColor === "" || isTierHexColor_(row.splitFontColor)) &&
+      ["Bottom", "Top", "Own"].includes(row.group);
+  });
+}
+
+function readCachedTierConfiguration_() {
+  const cache = getTierConfigurationCache_();
+  if (!cache) {
+    tierConfigurationCacheStatus_ = "unavailable";
+    return null;
+  }
+  try {
+    const serialized = cache.get(TIER_CONFIG_CACHE_KEY);
+    if (!serialized) {
+      tierConfigurationCacheStatus_ = "miss";
+      return null;
+    }
+    const cached = JSON.parse(serialized);
+    if (!isCachedTierConfigurationValid_(cached)) {
+      tierConfigurationCacheStatus_ = "invalid";
+      cache.remove(TIER_CONFIG_CACHE_KEY);
+      return null;
+    }
+    tierConfigurationCacheStatus_ = "hit";
+    return {
+      valid: true,
+      missing: false,
+      rows: cached.rows,
+      splitCount: cached.splitCount || 0,
+      errors: []
+    };
+  } catch (error) {
+    tierConfigurationCacheStatus_ = "error";
+    try { cache.remove(TIER_CONFIG_CACHE_KEY); } catch (removeError) {}
+    return null;
+  }
+}
+
+function cacheTierConfiguration_(result) {
+  if (!result || !result.valid || !isCachedTierConfigurationValid_({
+    schema: TIER_CONFIG_CACHE_SCHEMA,
+    rows: result.rows
+  })) return;
+  const cache = getTierConfigurationCache_();
+  if (!cache) return;
+  try {
+    cache.put(TIER_CONFIG_CACHE_KEY, JSON.stringify({
+      schema: TIER_CONFIG_CACHE_SCHEMA,
+      rows: result.rows,
+      splitCount: result.splitCount || 0
+    }), TIER_CONFIG_CACHE_TTL_SECONDS);
+  } catch (error) {}
+}
 
 function defaultTierConfigRows_() {
   const colorsByName = {};
@@ -55,6 +145,7 @@ function tierRowsToPasteList_(rows) {
 }
 
 function setupTierConfiguration_() {
+  invalidateTierConfigurationCache_();
   const ss = SpreadsheetApp.getActive();
   let sh = ss.getSheetByName(TIER_CONFIG_SHEET_NAME);
   if (sh) setManagedSheetColumnCount_(sh, 5);
@@ -290,11 +381,42 @@ function resetTierConfigurationToDefaults_() {
   applyTierConfiguration_(defaultTierConfigRows_());
 }
 
-function loadTierConfiguration_(force) {
-  if (tierConfigurationLoaded_ && !force) return tierConfigurationResult_;
-  const result = readTierConfiguration_();
+function loadTierConfiguration_(force, timer) {
+  if (tierConfigurationLoaded_ && !force) {
+    tierConfigurationLoadSource_ = "memory";
+    return tierConfigurationResult_;
+  }
+  if (force) invalidateTierConfigurationCache_();
+  tierConfigurationCacheStatus_ = force ? "bypassed" : "not-checked";
+  let phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+    ? startAnalyzerPhase_(timer)
+    : Date.now();
+  const cachedResult = !force ? readCachedTierConfiguration_() : null;
+  if (typeof endAnalyzerPhase_ === "function") {
+    endAnalyzerPhase_(timer, "tierConfigurationCacheLookup", phaseStartedAt);
+  }
+  let result = cachedResult;
+  if (!result) {
+    phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+      ? startAnalyzerPhase_(timer)
+      : Date.now();
+    result = readTierConfiguration_();
+    if (typeof endAnalyzerPhase_ === "function") {
+      endAnalyzerPhase_(timer, "tierConfigurationSheetRead", phaseStartedAt);
+    }
+  }
+  tierConfigurationLoadSource_ = cachedResult ? "document-cache" : "sheet";
   if (result.valid) applyTierConfiguration_(result.rows);
   else if (result.missing) resetTierConfigurationToDefaults_();
+  if (result.valid && !cachedResult) {
+    phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+      ? startAnalyzerPhase_(timer)
+      : Date.now();
+    cacheTierConfiguration_(result);
+    if (typeof endAnalyzerPhase_ === "function") {
+      endAnalyzerPhase_(timer, "tierConfigurationCacheWrite", phaseStartedAt);
+    }
+  }
   tierConfigurationLoaded_ = true;
   tierConfigurationResult_ = result;
   return result;

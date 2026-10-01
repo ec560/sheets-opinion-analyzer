@@ -160,6 +160,46 @@ function applyAnalysisStylePlan_(tool, startRow, startCol, styles) {
     .setVerticalAlignments(styles.verticalAlignments);
 }
 
+function buildAnalysisNumberFormatPlan_(outRowCount, labels) {
+  const formats = Array.from({ length: outRowCount }, () =>
+    Array(OUTPUT_WIDTH).fill("General")
+  );
+  const findLabel = label => labels.findIndex(value => String(value).trim() === label);
+
+  for (let row = 0; row < outRowCount; row++) formats[row][1] = "0.###";
+  for (let row = 9; row < outRowCount; row++) formats[row][2] = "0.0%";
+
+  const standardDeviationRow = findLabel("Standard Deviation");
+  if (standardDeviationRow >= 0) formats[standardDeviationRow][1] = "0.00";
+
+  const fuckRow = findLabel("Fuck");
+  if (fuckRow >= 0) {
+    formats[fuckRow][1] = "0.00";
+    formats[fuckRow][2] = "0.0%";
+  }
+
+  const splitRow = findLabel("Split");
+  if (splitRow >= 0) formats[splitRow][3] = "0.###";
+
+  [
+    findLabel("Most votes (weighted)"),
+    findLabel("Runner-up (weighted)"),
+    findLabel("Tier Mean"),
+    findLabel("Tier Median")
+  ].forEach(row => {
+    if (row >= 0) formats[row][2] = "0.###";
+  });
+  return formats;
+}
+
+function applyAnalysisNumberFormatPlan_(tool, startRow, startCol, outRowCount, labels) {
+  if (outRowCount <= 0) return;
+  const range = tool.getRange(startRow, startCol, outRowCount, OUTPUT_WIDTH);
+  if (typeof range.setNumberFormats === "function") {
+    range.setNumberFormats(buildAnalysisNumberFormatPlan_(outRowCount, labels));
+  }
+}
+
 function setWeightedDistributionFormulas_(
   tool,
   headerRow,
@@ -412,17 +452,7 @@ function formatAnalysisOutput_(
       `=SPARKLINE({RC[-1],1-RC[-1]},` +
       `{"charttype","bar";"color1","${fuckIsBackground ? "#9e9e9e" : "#000000"}";"color2","#f5f5f5";"max",1})`
     );
-    tool.getRange(r0 + idxFuckSignal, c0 + 1).setNumberFormat("0.00");
-    tool.getRange(r0 + idxFuckSignal, c0 + 2).setNumberFormat("0.0%");
   }
-  if (splitRow >= 0) {
-    tool.getRange(r0 + splitRow, c0 + 3).setNumberFormat("0.###");
-  }
-  [idxMost, idxRun, idxRun + 1, idxRun + 2].forEach(index => {
-    if (index >= 0 && index < outRowCount) {
-      tool.getRange(r0 + index, c0 + 2).setNumberFormat("0.###");
-    }
-  });
 
   if (distHeader >= 0) {
     setWeightedDistributionFormulas_(
@@ -480,12 +510,19 @@ function clearAnalysisOutput_(tool, resetFormat) {
   }
 
   const output = tool.getRange(r0, OUTPUT_COL, lastRow - r0 + 1, OUTPUT_WIDTH);
-  output.breakApart().clearContent();
+  output.breakApart();
   if (resetFormat) {
-    if (typeof output.clearFormat === "function") output.clearFormat();
-    if (typeof output.clearNote === "function") output.clearNote();
+    if (typeof output.clear === "function") {
+      output.clear();
+    } else {
+      output.clearContent();
+      if (typeof output.clearFormat === "function") output.clearFormat();
+      if (typeof output.clearNote === "function") output.clearNote();
+    }
     if (typeof output.setFontFamily === "function") output.setFontFamily("Mukta");
     if (typeof output.setFontSize === "function") output.setFontSize(10);
+  } else {
+    output.clearContent();
   }
 }
 
