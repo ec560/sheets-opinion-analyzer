@@ -165,6 +165,12 @@ function refreshLevelDropdownWithTiming_(selectedTierName, timer) {
         : "unknown",
       levelHeaderCacheStatus: typeof levelHeaderCacheStatus_ === "string"
         ? levelHeaderCacheStatus_
+        : "unknown",
+      levelHeaderLastColumnSource: typeof levelHeaderLastColumnSource_ === "string"
+        ? levelHeaderLastColumnSource_
+        : "unknown",
+      levelHeaderColumnIndexStatus: typeof levelHeaderColumnIndexStatus_ === "string"
+        ? levelHeaderColumnIndexStatus_
         : "unknown"
     });
   }
@@ -310,8 +316,11 @@ function getLevelHeaders_(tierSheet, bodyValues, timer, knownLastColumn) {
 
 const LEVEL_HEADER_CACHE_SCHEMA = 1;
 const LEVEL_HEADER_CACHE_TTL_SECONDS = 21600;
+const LEVEL_HEADER_COLUMN_INDEX_TTL_SECONDS = 300;
 let levelHeaderLoadSource_ = "not-loaded";
 let levelHeaderCacheStatus_ = "not-checked";
+let levelHeaderLastColumnSource_ = "not-loaded";
+let levelHeaderColumnIndexStatus_ = "not-checked";
 
 function getLevelHeaderCache_() {
   if (typeof CacheService === "undefined" || !CacheService.getDocumentCache) return null;
@@ -322,9 +331,9 @@ function getLevelHeaderCache_() {
   }
 }
 
-function levelHeaderCacheKey_(tierSheet, lastColumn) {
+function levelHeaderCacheIdentity_(tierSheet) {
   let spreadsheetId = "active";
-  let sheetId = typeof tierSheet.getSheetId === "function" ? tierSheet.getSheetId() : tierSheet.getName();
+  const sheetId = typeof tierSheet.getSheetId === "function" ? tierSheet.getSheetId() : tierSheet.getName();
   try {
     const parent = typeof tierSheet.getParent === "function" ? tierSheet.getParent() : null;
     if (parent && typeof parent.getId === "function") spreadsheetId = parent.getId();
@@ -333,12 +342,38 @@ function levelHeaderCacheKey_(tierSheet, lastColumn) {
       if (active && typeof active.getId === "function") spreadsheetId = active.getId();
     }
   } catch (error) {}
-  return [
-    "analyzer:level-headers:v" + LEVEL_HEADER_CACHE_SCHEMA,
-    spreadsheetId,
-    sheetId,
+  return spreadsheetId + ":" + sheetId;
+}
+
+function levelHeaderCacheKey_(tierSheet, lastColumn) {
+  return "analyzer:level-headers:v" + LEVEL_HEADER_CACHE_SCHEMA + ":" +
+    levelHeaderCacheIdentity_(tierSheet) + ":" + lastColumn;
+}
+
+function levelHeaderColumnIndexKey_(tierSheet) {
+  return "analyzer:level-header-column:v" + LEVEL_HEADER_CACHE_SCHEMA + ":" +
+    levelHeaderCacheIdentity_(tierSheet);
+}
+
+function parseCachedLevelHeaderColumn_(serialized) {
+  if (!serialized) return null;
+  try {
+    const cached = JSON.parse(serialized);
+    return cached.schema === LEVEL_HEADER_CACHE_SCHEMA &&
+      Number.isInteger(cached.lastColumn) && cached.lastColumn > 0
+      ? cached.lastColumn
+      : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function cacheLevelHeaderColumnIndex_(cache, tierSheet, lastColumn) {
+  if (!cache) return;
+  cache.put(levelHeaderColumnIndexKey_(tierSheet), JSON.stringify({
+    schema: LEVEL_HEADER_CACHE_SCHEMA,
     lastColumn
-  ].join(":");
+  }), LEVEL_HEADER_COLUMN_INDEX_TTL_SECONDS);
 }
 
 function parseCachedLevelHeaders_(serialized, lastColumn) {
@@ -369,40 +404,86 @@ function cacheLevelHeaders_(tierSheet, lastColumn, headers) {
       lastColumn,
       headers
     }), LEVEL_HEADER_CACHE_TTL_SECONDS);
+    cacheLevelHeaderColumnIndex_(cache, tierSheet, lastColumn);
   } catch (error) {}
 }
 
-function getLevelHeadersForSelection_(tierSheet, timer) {
-  let phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+function readCachedLevelHeaders_(cache, tierSheet, lastColumn, timer) {
+  const phaseStartedAt = typeof startAnalyzerPhase_ === "function"
     ? startAnalyzerPhase_(timer)
     : Date.now();
-  const lastColumn = tierSheet.getLastColumn();
-  if (typeof endAnalyzerPhase_ === "function") {
-    endAnalyzerPhase_(timer, "headerLastColumnRead", phaseStartedAt);
+  let headers = null;
+  try {
+    const key = levelHeaderCacheKey_(tierSheet, lastColumn);
+    const serialized = cache.get(key);
+    headers = parseCachedLevelHeaders_(serialized, lastColumn);
+    levelHeaderCacheStatus_ = headers ? "hit" : serialized ? "invalid" : "miss";
+    if (!headers && serialized) cache.remove(key);
+  } catch (error) {
+    levelHeaderCacheStatus_ = "error";
   }
+  if (typeof endAnalyzerPhase_ === "function") {
+    endAnalyzerPhase_(timer, "headerCacheLookup", phaseStartedAt);
+  }
+  return headers;
+}
+
+function getLevelHeadersForSelection_(tierSheet, timer) {
   const cache = getLevelHeaderCache_();
   levelHeaderCacheStatus_ = cache ? "not-checked" : "unavailable";
+  levelHeaderColumnIndexStatus_ = cache ? "not-checked" : "unavailable";
+  let lastColumn = null;
+
   if (cache) {
-    const key = levelHeaderCacheKey_(tierSheet, lastColumn);
-    let headers = null;
-    phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+    let phaseStartedAt = typeof startAnalyzerPhase_ === "function"
       ? startAnalyzerPhase_(timer)
       : Date.now();
     try {
-      const serialized = cache.get(key);
-      headers = parseCachedLevelHeaders_(serialized, lastColumn);
-      levelHeaderCacheStatus_ = headers ? "hit" : serialized ? "invalid" : "miss";
+      const serialized = cache.get(levelHeaderColumnIndexKey_(tierSheet));
+      lastColumn = parseCachedLevelHeaderColumn_(serialized);
+      levelHeaderColumnIndexStatus_ = lastColumn
+        ? "hit"
+        : serialized ? "invalid" : "miss";
     } catch (error) {
-      levelHeaderCacheStatus_ = "error";
+      levelHeaderColumnIndexStatus_ = "error";
     }
     if (typeof endAnalyzerPhase_ === "function") {
-      endAnalyzerPhase_(timer, "headerCacheLookup", phaseStartedAt);
+      endAnalyzerPhase_(timer, "headerColumnIndexLookup", phaseStartedAt);
     }
+    if (lastColumn) {
+      levelHeaderLastColumnSource_ = "cache-index";
+      const indexedHeaders = readCachedLevelHeaders_(cache, tierSheet, lastColumn, timer);
+      if (indexedHeaders) {
+        levelHeaderLoadSource_ = "document-cache";
+        return indexedHeaders;
+      }
+      try { cache.remove(levelHeaderColumnIndexKey_(tierSheet)); } catch (error) {}
+      lastColumn = null;
+    }
+  }
+
+  let phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+    ? startAnalyzerPhase_(timer)
+    : Date.now();
+  lastColumn = tierSheet.getLastColumn();
+  levelHeaderLastColumnSource_ = "sheet";
+  if (typeof endAnalyzerPhase_ === "function") {
+    endAnalyzerPhase_(timer, "headerLastColumnRead", phaseStartedAt);
+  }
+
+  if (cache) {
+    const headers = readCachedLevelHeaders_(cache, tierSheet, lastColumn, timer);
     if (headers) {
+      phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+        ? startAnalyzerPhase_(timer)
+        : Date.now();
+      try { cacheLevelHeaderColumnIndex_(cache, tierSheet, lastColumn); } catch (error) {}
+      if (typeof endAnalyzerPhase_ === "function") {
+        endAnalyzerPhase_(timer, "headerColumnIndexWrite", phaseStartedAt);
+      }
       levelHeaderLoadSource_ = "document-cache";
       return headers;
     }
-    try { cache.remove(key); } catch (error) {}
   }
 
   phaseStartedAt = typeof startAnalyzerPhase_ === "function"
@@ -424,11 +505,18 @@ function getLevelHeadersForSelection_(tierSheet, timer) {
 }
 
 function invalidateLevelHeaderCache_(tierSheet) {
-  if (!tierSheet || typeof tierSheet.getLastColumn !== "function") return;
+  if (!tierSheet) return;
   const cache = getLevelHeaderCache_();
   if (!cache) return;
   try {
-    cache.remove(levelHeaderCacheKey_(tierSheet, tierSheet.getLastColumn()));
+    const indexKey = levelHeaderColumnIndexKey_(tierSheet);
+    const indexedLastColumn = parseCachedLevelHeaderColumn_(cache.get(indexKey));
+    if (indexedLastColumn) {
+      cache.remove(levelHeaderCacheKey_(tierSheet, indexedLastColumn));
+    } else if (typeof tierSheet.getLastColumn === "function") {
+      cache.remove(levelHeaderCacheKey_(tierSheet, tierSheet.getLastColumn()));
+    }
+    cache.remove(indexKey);
   } catch (error) {}
 }
 

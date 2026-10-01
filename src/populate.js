@@ -278,6 +278,12 @@ function populateSelectedLevelUnlocked_(options) {
         : "unknown",
       levelHeaderCacheStatus: typeof levelHeaderCacheStatus_ === "string"
         ? levelHeaderCacheStatus_
+        : "unknown",
+      levelHeaderLastColumnSource: typeof levelHeaderLastColumnSource_ === "string"
+        ? levelHeaderLastColumnSource_
+        : "unknown",
+      levelHeaderColumnIndexStatus: typeof levelHeaderColumnIndexStatus_ === "string"
+        ? levelHeaderColumnIndexStatus_
         : "unknown"
     });
   }
