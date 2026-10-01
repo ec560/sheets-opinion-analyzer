@@ -19,8 +19,14 @@ function analyzeSelectedLevel(options) {
 }
 
 function analyzeSelectedLevelWithTiming_(options, timer) {
+  let phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+    ? startAnalyzerPhase_(timer)
+    : Date.now();
   const ss = SpreadsheetApp.getActive();
   const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
+  if (typeof endAnalyzerPhase_ === "function") {
+    endAnalyzerPhase_(timer, "analysisSheetLookup", phaseStartedAt);
+  }
   if (!tool) {
     SpreadsheetApp.getUi().alert("Run Tier Tools > Setup before analyzing opinions.");
     return false;
@@ -37,14 +43,23 @@ function analyzeSelectedLevelWithTiming_(options, timer) {
     preparedValues.length === preparedFontColors.length;
   const hasValidatedPreparedContext = hasPreparedData &&
     options && options.tierName != null && options.levelName != null;
-  const selected = hasValidatedPreparedContext
-    ? { tierName: String(options.tierName).trim(), levelName: String(options.levelName).trim() }
-    : typeof readAnalyzerSelection_ === "function"
+  let selected;
+  if (hasValidatedPreparedContext) {
+    selected = { tierName: String(options.tierName).trim(), levelName: String(options.levelName).trim() };
+  } else {
+    phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+      ? startAnalyzerPhase_(timer)
+      : Date.now();
+    selected = typeof readAnalyzerSelection_ === "function"
       ? readAnalyzerSelection_(tool)
       : {
         tierName: String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim(),
         levelName: String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim()
       };
+    if (typeof endAnalyzerPhase_ === "function") {
+      endAnalyzerPhase_(timer, "initialAnalysisSelectorRead", phaseStartedAt);
+    }
+  }
   const selectedTierName = selected.tierName;
   const selectedLevelName = selected.levelName;
   const expectedTierName = options && options.tierName != null
@@ -67,9 +82,19 @@ function analyzeSelectedLevelWithTiming_(options, timer) {
     const configStartedAt = typeof startAnalyzerPhase_ === "function"
       ? startAnalyzerPhase_(timer)
       : Date.now();
-    const configResult = loadTierConfiguration_();
+    const configResult = loadTierConfiguration_(false, timer);
     if (typeof endAnalyzerPhase_ === "function") {
       endAnalyzerPhase_(timer, "tierConfigurationLoading", configStartedAt);
+    }
+    if (timer && typeof timer.setContext === "function") {
+      timer.setContext({
+        tierConfigurationSource: typeof tierConfigurationLoadSource_ === "string"
+          ? tierConfigurationLoadSource_
+          : "unknown",
+        tierConfigurationCacheStatus: typeof tierConfigurationCacheStatus_ === "string"
+          ? tierConfigurationCacheStatus_
+          : "unknown"
+      });
     }
     const configError = tierConfigurationErrorMessage_(configResult);
     if (configError) {
@@ -134,7 +159,13 @@ function analyzeSelectedLevelWithTiming_(options, timer) {
     endAnalyzerPhase_(timer, "inMemoryAnalysis", analysisStartedAt);
   }
   if (analysis.rawCount === 0) {
-    if (!analysisSelectionStillCurrent_(tool, tierName, levelName)) return false;
+    if (!analysisSelectionStillCurrent_(
+      tool,
+      tierName,
+      levelName,
+      timer,
+      "finalSelectorValidation"
+    )) return false;
     applyCountedPlayerHighlights_(tool, DATA_START_ROW, bgs, analysis.countedRowFlags, vals);
     setAnalysisStatusMessage_(tool, "No usable opinions", "#fce8e6");
     return false;
@@ -178,6 +209,9 @@ function analyzeSelectedLevelWithTiming_(options, timer) {
     currentTier,
     moveFailureReason
   } = analysis;
+  const assemblyStartedAt = typeof startAnalyzerPhase_ === "function"
+    ? startAnalyzerPhase_(timer)
+    : Date.now();
   const reliabilityDistribution = buildReliabilityDistribution_(bgs, countedRowFlags);
   const placeMoveFailure = canMove ? null : resolvePlaceMoveFailure_({
     isPending,
@@ -256,8 +290,17 @@ function analyzeSelectedLevelWithTiming_(options, timer) {
       out.push([name, count, count / denominator, ""]);
     }
   }
+  if (typeof endAnalyzerPhase_ === "function") {
+    endAnalyzerPhase_(timer, "analysisResultAssembly", assemblyStartedAt);
+  }
 
-  if (!analysisSelectionStillCurrent_(tool, tierName, levelName)) {
+  if (!analysisSelectionStillCurrent_(
+    tool,
+    tierName,
+    levelName,
+    timer,
+    "finalSelectorValidation"
+  )) {
     return false;
   }
 
@@ -301,13 +344,19 @@ function analyzeSelectedLevelWithTiming_(options, timer) {
   return true;
 }
 
-function analysisSelectionStillCurrent_(tool, tierName, levelName) {
+function analysisSelectionStillCurrent_(tool, tierName, levelName, timer, phaseName) {
+  const phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+    ? startAnalyzerPhase_(timer)
+    : Date.now();
   const selection = typeof readAnalyzerSelection_ === "function"
     ? readAnalyzerSelection_(tool)
     : {
       tierName: String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim(),
       levelName: String(tool.getRange(LEVEL_CELL).getDisplayValue() || "").trim()
     };
+  if (typeof endAnalyzerPhase_ === "function") {
+    endAnalyzerPhase_(timer, phaseName || "analysisSelectorValidation", phaseStartedAt);
+  }
   return selection.tierName === tierName && selection.levelName === levelName;
 }
 

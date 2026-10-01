@@ -510,12 +510,19 @@ function clearAnalysisOutput_(tool, resetFormat) {
   }
 
   const output = tool.getRange(r0, OUTPUT_COL, lastRow - r0 + 1, OUTPUT_WIDTH);
-  output.breakApart().clearContent();
+  output.breakApart();
   if (resetFormat) {
-    if (typeof output.clearFormat === "function") output.clearFormat();
-    if (typeof output.clearNote === "function") output.clearNote();
+    if (typeof output.clear === "function") {
+      output.clear();
+    } else {
+      output.clearContent();
+      if (typeof output.clearFormat === "function") output.clearFormat();
+      if (typeof output.clearNote === "function") output.clearNote();
+    }
     if (typeof output.setFontFamily === "function") output.setFontFamily("Mukta");
     if (typeof output.setFontSize === "function") output.setFontSize(10);
+  } else {
+    output.clearContent();
   }
 }
 

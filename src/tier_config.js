@@ -11,6 +11,8 @@ const TIER_CONFIG_CACHE_KEY = "analyzer:tier-configuration:v" + TIER_CONFIG_CACH
 const TIER_CONFIG_CACHE_TTL_SECONDS = 21600;
 let tierConfigurationLoaded_ = false;
 let tierConfigurationResult_ = null;
+let tierConfigurationLoadSource_ = "not-loaded";
+let tierConfigurationCacheStatus_ = "not-checked";
 
 function getTierConfigurationCache_() {
   if (typeof CacheService === "undefined" || !CacheService.getDocumentCache) return null;
@@ -50,15 +52,23 @@ function isCachedTierConfigurationValid_(cached) {
 
 function readCachedTierConfiguration_() {
   const cache = getTierConfigurationCache_();
-  if (!cache) return null;
+  if (!cache) {
+    tierConfigurationCacheStatus_ = "unavailable";
+    return null;
+  }
   try {
     const serialized = cache.get(TIER_CONFIG_CACHE_KEY);
-    if (!serialized) return null;
+    if (!serialized) {
+      tierConfigurationCacheStatus_ = "miss";
+      return null;
+    }
     const cached = JSON.parse(serialized);
     if (!isCachedTierConfigurationValid_(cached)) {
+      tierConfigurationCacheStatus_ = "invalid";
       cache.remove(TIER_CONFIG_CACHE_KEY);
       return null;
     }
+    tierConfigurationCacheStatus_ = "hit";
     return {
       valid: true,
       missing: false,
@@ -67,6 +77,7 @@ function readCachedTierConfiguration_() {
       errors: []
     };
   } catch (error) {
+    tierConfigurationCacheStatus_ = "error";
     try { cache.remove(TIER_CONFIG_CACHE_KEY); } catch (removeError) {}
     return null;
   }
@@ -370,13 +381,42 @@ function resetTierConfigurationToDefaults_() {
   applyTierConfiguration_(defaultTierConfigRows_());
 }
 
-function loadTierConfiguration_(force) {
-  if (tierConfigurationLoaded_ && !force) return tierConfigurationResult_;
+function loadTierConfiguration_(force, timer) {
+  if (tierConfigurationLoaded_ && !force) {
+    tierConfigurationLoadSource_ = "memory";
+    return tierConfigurationResult_;
+  }
   if (force) invalidateTierConfigurationCache_();
-  const result = !force && readCachedTierConfiguration_() || readTierConfiguration_();
+  tierConfigurationCacheStatus_ = force ? "bypassed" : "not-checked";
+  let phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+    ? startAnalyzerPhase_(timer)
+    : Date.now();
+  const cachedResult = !force ? readCachedTierConfiguration_() : null;
+  if (typeof endAnalyzerPhase_ === "function") {
+    endAnalyzerPhase_(timer, "tierConfigurationCacheLookup", phaseStartedAt);
+  }
+  let result = cachedResult;
+  if (!result) {
+    phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+      ? startAnalyzerPhase_(timer)
+      : Date.now();
+    result = readTierConfiguration_();
+    if (typeof endAnalyzerPhase_ === "function") {
+      endAnalyzerPhase_(timer, "tierConfigurationSheetRead", phaseStartedAt);
+    }
+  }
+  tierConfigurationLoadSource_ = cachedResult ? "document-cache" : "sheet";
   if (result.valid) applyTierConfiguration_(result.rows);
   else if (result.missing) resetTierConfigurationToDefaults_();
-  if (result.valid) cacheTierConfiguration_(result);
+  if (result.valid && !cachedResult) {
+    phaseStartedAt = typeof startAnalyzerPhase_ === "function"
+      ? startAnalyzerPhase_(timer)
+      : Date.now();
+    cacheTierConfiguration_(result);
+    if (typeof endAnalyzerPhase_ === "function") {
+      endAnalyzerPhase_(timer, "tierConfigurationCacheWrite", phaseStartedAt);
+    }
+  }
   tierConfigurationLoaded_ = true;
   tierConfigurationResult_ = result;
   return result;
