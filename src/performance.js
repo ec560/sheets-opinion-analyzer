@@ -1,4 +1,5 @@
 const ANALYZER_TIMING_LOG_PREFIX = "analyzer.performance";
+const ANALYZER_PERFORMANCE_LOGGING_ENABLED = false;
 
 function createAnalyzerPhaseTimer_(context) {
   const startedAt = Date.now();
@@ -24,7 +25,9 @@ function createAnalyzerPhaseTimer_(context) {
         totalMs: Math.max(0, Date.now() - startedAt),
         phasesMs: phases
       });
-      console.log(ANALYZER_TIMING_LOG_PREFIX + " " + JSON.stringify(entry));
+      if (ANALYZER_PERFORMANCE_LOGGING_ENABLED) {
+        console.log(ANALYZER_TIMING_LOG_PREFIX + " " + JSON.stringify(entry));
+      }
     }
   };
 }
