@@ -354,10 +354,16 @@ function buildTierFlagScan_(tierName, tierSheet) {
   const rows = [];
   let scanned = 0;
   const platformerStartIndex = findPlatformerSectionStartIndex_(tierSheet, headers, vals);
+  const lockedLevelStates = typeof getLevelLockStates_ === "function"
+    ? getLevelLockStates_(tierSheet, headers.map(header => header.col))
+    : null;
   headers.forEach((header, headerIndex) => {
     const sectionIndex = platformerStartIndex >= 0 && headerIndex >= platformerStartIndex ? 1 : 0;
 
-    if (typeof isLevelLocked_ === "function" && isLevelLocked_(tierSheet, header.col)) return;
+    const isLocked = lockedLevelStates
+      ? lockedLevelStates[headerIndex]
+      : (typeof isLevelLocked_ === "function" && isLevelLocked_(tierSheet, header.col));
+    if (isLocked) return;
     scanned++;
     const levelData = extractLevelFlagData_(header, vals, bgs, fcs, lastCol);
     let bookshelfFlag = null;

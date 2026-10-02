@@ -116,10 +116,31 @@ function getSelectedLevelForLocking_(ss) {
 }
 
 function isLevelLocked_(sheet, startCol) {
-  const background = hex_(sheet.getRange(1, startCol).getBackground());
+  const background = sheet.getRange(1, startCol).getBackground();
+  return isLevelLockedBackground_(sheet, background);
+}
+
+function isLevelLockedBackground_(sheet, background) {
+  background = hex_(background);
   if (background === LEVEL_LOCK_BLACK_MARKER) return true;
   if (background !== LEVEL_LOCK_BACKGROUND) return false;
   return !isFuckTierSheet_(sheet);
+}
+
+function getLevelLockStates_(sheet, startColumns) {
+  if (!startColumns || startColumns.length === 0) return [];
+
+  const firstColumn = Math.min(...startColumns);
+  const lastColumn = Math.max(...startColumns);
+  // A Spreadsheet service call per level dominates batch-scan runtime. Read
+  // every header marker in one request and classify the colors in memory.
+  const backgrounds = sheet
+    .getRange(1, firstColumn, 1, lastColumn - firstColumn + 1)
+    .getBackgrounds()[0];
+
+  return startColumns.map(startCol => {
+    return isLevelLockedBackground_(sheet, backgrounds[startCol - firstColumn]);
+  });
 }
 
 function isFuckTierSheet_(sheet) {
