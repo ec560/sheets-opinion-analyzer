@@ -14,6 +14,13 @@ function onEdit(e) {
     invalidateLevelHeaderCache_(sh);
   }
   if (sheetName === TIER_CONFIG_SHEET_NAME) {
+    if (
+      typeof refreshTierDecisionSections_ === "function" &&
+      (typeof tierConfigurationEditTouchesDecisionSections_ !== "function" ||
+        tierConfigurationEditTouchesDecisionSections_(range))
+    ) {
+      refreshTierDecisionSections_(sh);
+    }
     if (typeof invalidateTierConfigurationCache_ === "function") {
       invalidateTierConfigurationCache_();
     } else {
