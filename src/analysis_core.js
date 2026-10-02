@@ -164,9 +164,7 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
   const currentTier = String(tierName || "").trim();
   const currentIdx = orderedTierNames.indexOf(currentTier);
   const isPending = currentTier.toLowerCase() === "pending";
-  let splitThreshold = 3;
-  if (allWeight >= 50 && allWeight < 100) splitThreshold = 4;
-  else if (allWeight >= 100) splitThreshold = 5;
+  const splitThreshold = requiredSplitForWeightedOpinions_(allWeight);
   const requiredSplitPct = 0.05;
   const tierSplit = calculateSplit_(
     orderedTierNames,
@@ -218,13 +216,13 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
   );
   const decisionLockSideTotal = decisionTierSplit.winner.weight;
   const lockSharePct = allWeight > 0 ? decisionLockSideTotal / allWeight : 0;
-  const isLockWorthy = lockSharePct >= FLAG_LOCK_SHARE &&
-    rawCount >= FLAG_LOCK_MIN_RAW_COUNT &&
-    allWeight >= FLAG_LOCK_MIN_WEIGHT;
+  const isLockWorthy = lockSharePct >= analyzerDecisionConfiguration.lockThreshold &&
+    rawCount >= analyzerDecisionConfiguration.lockMinimumRawOpinions &&
+    allWeight >= analyzerDecisionConfiguration.lockMinimumWeightedOpinions;
 
   const toppct = allWeight > 0 ? topWeight / allWeight : 0;
   const fuckpct = allAndFuck > 0 ? fuckWeight / (totalWeight || 1) : 0;
-  const hasMinimumTotalOpinions = allWeight >= FLAG_LOW_OPINION_WEIGHT;
+  const hasMinimumTotalOpinions = allWeight >= analyzerDecisionConfiguration.minimumOpinions;
   const passesMajority = hasMinimumTotalOpinions;
   const fuckRules = evaluateFuckRules_(
     fuckPresent,
@@ -425,7 +423,9 @@ function evaluateFuckRules_(fuckPresent, fuckOpinionCount, fuckpct, sd, passesMa
 }
 
 function determinePlaceMoveFailureReason_(ctx) {
-  if (ctx.totalWeightedOpinions < 4) return "needs_more_opinions";
+  if (ctx.totalWeightedOpinions < analyzerDecisionConfiguration.minimumOpinions) {
+    return "needs_more_opinions";
+  }
 
   if (ctx.fuckRules.isFuckMode) {
     if (ctx.isPending && !ctx.passesMajority) return "needs_more_opinions";

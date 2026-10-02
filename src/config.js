@@ -3,7 +3,7 @@
 const ANALYSIS_SHEET_NAME = "Tier Analysis";
 const FLAG_SCAN_SHEET_NAME = "Tier Flags";
 const TIER_CONFIG_SHEET_NAME = "Tier Configuration";
-const VERSION = "v1.14.5";
+const VERSION = "v1.15.0";
 const TIER_CELL = "B1";
 const LEVEL_CELL = "B2";
 const DATA_START_ROW = 4;                      // where A:C gets populated
@@ -50,6 +50,66 @@ const COUNTED_PLAYER_HIGHLIGHT = "#e6f4ea";
 const DUPLICATE_PLAYER_HIGHLIGHT = "#f9ab00";
 const PRE_UPDATE_PLAYER_HIGHLIGHT = "#b4a7d6";
 const LEVEL_LOCK_BLACK_MARKER = "#010000";
+
+// Defaults used when Tier Configuration does not yet contain decision rules.
+// The active values are refreshed from that sheet alongside the tier colors.
+const DEFAULT_SPLIT_REQUIREMENTS = [
+  { minimumWeightedOpinions: 0, requiredSplit: 3 },
+  { minimumWeightedOpinions: 50, requiredSplit: 4 },
+  { minimumWeightedOpinions: 100, requiredSplit: 5 }
+];
+
+const analyzerDecisionConfiguration = {
+  minimumOpinions: FLAG_LOW_OPINION_WEIGHT,
+  lockThreshold: FLAG_LOCK_SHARE,
+  lockMinimumRawOpinions: FLAG_LOCK_MIN_RAW_COUNT,
+  lockMinimumWeightedOpinions: FLAG_LOCK_MIN_WEIGHT,
+  splitRequirements: DEFAULT_SPLIT_REQUIREMENTS.map(rule => ({
+    minimumWeightedOpinions: rule.minimumWeightedOpinions,
+    requiredSplit: rule.requiredSplit
+  }))
+};
+
+function defaultAnalyzerDecisionConfiguration_() {
+  return {
+    minimumOpinions: FLAG_LOW_OPINION_WEIGHT,
+    lockThreshold: FLAG_LOCK_SHARE,
+    lockMinimumRawOpinions: FLAG_LOCK_MIN_RAW_COUNT,
+    lockMinimumWeightedOpinions: FLAG_LOCK_MIN_WEIGHT,
+    splitRequirements: DEFAULT_SPLIT_REQUIREMENTS.map(rule => ({
+      minimumWeightedOpinions: rule.minimumWeightedOpinions,
+      requiredSplit: rule.requiredSplit
+    }))
+  };
+}
+
+function applyAnalyzerDecisionConfiguration_(configuration) {
+  const source = configuration || defaultAnalyzerDecisionConfiguration_();
+  analyzerDecisionConfiguration.minimumOpinions = source.minimumOpinions;
+  analyzerDecisionConfiguration.lockThreshold = source.lockThreshold;
+  analyzerDecisionConfiguration.lockMinimumRawOpinions = source.lockMinimumRawOpinions;
+  analyzerDecisionConfiguration.lockMinimumWeightedOpinions = source.lockMinimumWeightedOpinions;
+  analyzerDecisionConfiguration.splitRequirements = source.splitRequirements.map(rule => ({
+    minimumWeightedOpinions: rule.minimumWeightedOpinions,
+    requiredSplit: rule.requiredSplit
+  }));
+}
+
+function resetAnalyzerDecisionConfiguration_() {
+  applyAnalyzerDecisionConfiguration_(defaultAnalyzerDecisionConfiguration_());
+}
+
+function requiredSplitForWeightedOpinions_(weightedOpinions) {
+  const rules = analyzerDecisionConfiguration.splitRequirements;
+  if (!rules.length) return 0;
+  const total = Number(weightedOpinions) || 0;
+  let selected = rules[0];
+  for (let index = 1; index < rules.length; index++) {
+    if (total < rules[index].minimumWeightedOpinions) break;
+    selected = rules[index];
+  }
+  return selected.requiredSplit;
+}
 
 // Optional experienced-player roster. Paste the full Google Sheets URL below.
 // Leave blank to disable experienced-player bookmark eligibility.
