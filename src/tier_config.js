@@ -544,7 +544,7 @@ function setupTierConfiguration_() {
     .setFontColor("#40566b")
     .setBackground("#f4f7fb");
   sh.getRange("A3:E3").mergeAcross()
-    .setValue("Split requirements use weighted opinions for placement and movement. Use the blank row to add a band.")
+    .setValue("Split requirements use weighted opinions to determine whether a level qualifies for placement or movement.")
     .setFontFamily("Mukta")
     .setFontSize(9)
     .setFontColor("#4a5f75")
