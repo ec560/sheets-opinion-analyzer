@@ -55,59 +55,66 @@ const TIER_FLAG_STYLES = {
     fontWeight: "normal",
     styleDifference: true
   },
+  pending_placement: {
+    priority: 1,
+    background: "#800b3b",
+    text: "#fff7fb",
+    fontWeight: "bold",
+    styleDifference: false
+  },
   pending_natural: {
     priority: 2,
-    background: "#fce8b2",
-    text: "#7a4f01",
+    background: "#956308",
+    text: "#fff9ec",
     fontWeight: "bold",
     styleDifference: true
   },
   pending_no_opinions: {
     priority: 3,
-    background: "#fce8e6",
-    text: "#b3261e",
+    background: "#e2e8f0",
+    text: "#46536b",
     fontWeight: "bold",
     styleDifference: false
   },
   pending_high_count: {
     priority: 4,
-    background: "#d2e3fc",
-    text: "#174ea6",
+    background: "#dceafb",
+    text: "#153d70",
     fontWeight: "bold",
     styleDifference: false
   },
   pending_split: {
     priority: 5,
-    background: "#e9d5ff",
-    text: "#681da8",
+    background: "#e4d0f8",
+    text: "#4c1d78",
     fontWeight: "bold",
     styleDifference: true
   },
   pending_strong_split: {
     priority: 6,
-    background: "#f3e8fd",
-    text: "#684c87",
+    background: "#eee2fa",
+    text: "#512578",
     fontWeight: "bold",
     styleDifference: true
   },
   pending_low_count: {
     priority: 8,
-    background: "#edf0f3",
-    text: "#4a4d52",
+    background: "#e2e8f0",
+    text: "#46536b",
     fontWeight: "bold",
     styleDifference: false
   },
   pending_low_reliability: {
     priority: 7,
-    background: "#e8eaed",
-    text: "#4a4d52",
+    background: "#e2e8f0",
+    text: "#46536b",
     fontWeight: "bold",
     styleDifference: false
   },
   pending_unflagged: {
     priority: 99,
-    background: "#f8f9fa",
-    text: "#5f6368",
+    background: "#f1f3f7",
+    text: "#586579",
     fontWeight: "normal",
     styleDifference: false
   },
@@ -766,6 +773,7 @@ function renderTierFlagScan_(ss, tierName, flagRows) {
 function formatTierFlagScan_(sh, rows, colCount, flagRows) {
   const rowCount = rows.length;
   if (rowCount === 0 || colCount === 0) return;
+  const isPendingScan = String(rows[0][1] || "").toLowerCase() === "pending";
 
   sh.setHiddenGridlines(true);
   sh.getRange(1, 1, rowCount, colCount)
@@ -776,7 +784,7 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
     .setVerticalAlignment("middle");
 
   sh.getRange(1, 1, 1, colCount)
-    .setBackground("#e8f0fe")
+    .setBackground(isPendingScan ? "#edf0f4" : "#e8f0fe")
     .setFontWeight("bold");
 
   sh.getRange(1, 3)
@@ -792,7 +800,8 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
   styleTierFlagCell_(sh, 1, 2, rows[0][1]);
 
   sh.getRange(2, 1, 1, colCount)
-    .setBackground("#eeeeee")
+    .setBackground(isPendingScan ? "#e2e8f0" : "#eeeeee")
+    .setFontColor(isPendingScan ? "#46536b" : "#202124")
     .setFontWeight("bold");
   sh.setColumnWidth(1, 150);
   sh.setColumnWidth(4, 225);
@@ -809,18 +818,16 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
   const fontColors = [];
   const fontWeights = [];
   const fontStyles = [];
-  const fontSizes = [];
-  const isPendingScan = String(rows[0][1] || "").toLowerCase() === "pending";
 
   for (let i = 2; i < rowCount; i++) {
     const row = rows[i];
     const flagRow = flagRows && flagRows.length > (i - 2) ? flagRows[i - 2] : null;
-    const flagStyle = tierFlagStyle_(flagRow && flagRow.styleKey);
-    const rowBackgrounds = new Array(colCount).fill("#ffffff");
-    const rowFontColors = new Array(colCount).fill("#202124");
+    const styleKey = flagRow && flagRow.styleKey;
+    const flagStyle = tierFlagStyle_(isPendingScan && styleKey === "movement" ? "pending_placement" : styleKey);
+    const rowBackgrounds = new Array(colCount).fill(isPendingScan ? "#fbfcfe" : "#ffffff");
+    const rowFontColors = new Array(colCount).fill(isPendingScan ? "#20242e" : "#202124");
     const rowFontWeights = new Array(colCount).fill("normal");
     const rowFontStyles = new Array(colCount).fill("normal");
-    const rowFontSizes = new Array(colCount).fill(10);
     if (isPendingScan) rowFontColors[6] = "#3c4043";
 
     if (String(row[0] || "") === "No flagged levels") {
@@ -828,7 +835,8 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
       rowFontColors.fill("#5f6368");
       rowFontStyles.fill("italic");
     } else if (flagRow && flagRow.styleKey === "pending_unflagged") {
-      rowBackgrounds.fill(flagStyle.background);
+      if (!isPendingScan) rowBackgrounds.fill(flagStyle.background);
+      rowBackgrounds[3] = flagStyle.background;
       // De-emphasize status without making the split evidence look disabled.
       rowFontColors.fill("#3c4043");
       rowFontColors[0] = flagStyle.text;
@@ -842,7 +850,6 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
       if (isPendingScan) {
         rowFontWeights[0] = "bold";
         rowFontWeights[3] = "bold";
-        rowFontSizes[3] = 11;
       } else if (flagStyle.styleDifference) {
         rowBackgrounds[6] = flagStyle.background;
         rowFontColors[6] = flagStyle.text;
@@ -854,7 +861,6 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
     fontColors.push(rowFontColors);
     fontWeights.push(rowFontWeights);
     fontStyles.push(rowFontStyles);
-    fontSizes.push(rowFontSizes);
   }
 
   const resultRange = sh.getRange(3, 1, rowCount - 2, colCount);
@@ -862,8 +868,13 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
     .setBackgrounds(backgrounds)
     .setFontColors(fontColors)
     .setFontWeights(fontWeights)
-    .setFontStyles(fontStyles)
-    .setFontSizes(fontSizes);
+    .setFontStyles(fontStyles);
+
+  if (isPendingScan) {
+    sh.getRange(3, 4, rowCount - 2, 1).setWrap(true);
+    sh.getRange(3, 7, rowCount - 2, 1).setHorizontalAlignment("right");
+    sh.autoResizeRows(3, rowCount - 2);
+  }
 
   applyTierFlagSectionBorders_(sh, flagRows, colCount);
 }
