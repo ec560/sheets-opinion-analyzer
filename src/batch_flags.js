@@ -57,7 +57,7 @@ const TIER_FLAG_STYLES = {
   },
   pending_natural: {
     priority: 2,
-    background: "#fef7e0",
+    background: "#fce8b2",
     text: "#7a4f01",
     fontWeight: "bold",
     styleDifference: true
@@ -78,29 +78,36 @@ const TIER_FLAG_STYLES = {
   },
   pending_split: {
     priority: 5,
-    background: "#f3e8fd",
+    background: "#e9d5ff",
     text: "#681da8",
     fontWeight: "bold",
     styleDifference: true
   },
   pending_strong_split: {
     priority: 6,
-    background: "#f5f0fa",
+    background: "#f3e8fd",
     text: "#684c87",
-    fontWeight: "normal",
+    fontWeight: "bold",
     styleDifference: true
   },
   pending_low_count: {
     priority: 8,
-    background: "#f8f9fa",
-    text: "#6f7277",
-    fontWeight: "normal",
+    background: "#edf0f3",
+    text: "#4a4d52",
+    fontWeight: "bold",
     styleDifference: false
   },
   pending_low_reliability: {
     priority: 7,
     background: "#e8eaed",
     text: "#4a4d52",
+    fontWeight: "bold",
+    styleDifference: false
+  },
+  pending_unflagged: {
+    priority: 99,
+    background: "#f8f9fa",
+    text: "#5f6368",
     fontWeight: "normal",
     styleDifference: false
   },
@@ -307,7 +314,8 @@ function scanSelectedTierFlags() {
     throw error;
   }
   if (result.scanned === 0) {
-    ui.alert("Tier Flag Scan", "No unlocked level headers found on \"" + tierName + "\".", ui.ButtonSet.OK);
+    const headerType = tierName.toLowerCase() === "pending" ? "level" : "unlocked level";
+    ui.alert("Tier Flag Scan", "No " + headerType + " headers found on \"" + tierName + "\".", ui.ButtonSet.OK);
     return;
   }
 
@@ -316,7 +324,8 @@ function scanSelectedTierFlags() {
 
   ui.alert(
     "Tier Flag Scan",
-    result.rows.length + " flagged level" + (result.rows.length === 1 ? "" : "s") +
+    result.rows.length + (tierName.toLowerCase() === "pending" ? " pending level" : " flagged level") +
+      (result.rows.length === 1 ? "" : "s") +
       " found across " + result.scanned + " level" + (result.scanned === 1 ? "" : "s") + ".",
     ui.ButtonSet.OK
   );
@@ -334,6 +343,7 @@ function getFlagScanTierName_(ss, tool) {
 }
 
 function buildTierFlagScan_(tierName, tierSheet) {
+  const isPendingTier = tierName.toLowerCase() === "pending";
   const lastRow = tierSheet.getLastRow();
   const lastCol = tierSheet.getLastColumn();
   const numRows = Math.max(0, lastRow - 1);
@@ -363,7 +373,7 @@ function buildTierFlagScan_(tierName, tierSheet) {
     const isLocked = lockedLevelStates
       ? lockedLevelStates[headerIndex]
       : (typeof isLevelLocked_ === "function" && isLevelLocked_(tierSheet, header.col));
-    if (isLocked) return;
+    if (isLocked && !isPendingTier) return;
     scanned++;
     const levelData = extractLevelFlagData_(header, vals, bgs, fcs, lastCol);
     let bookshelfFlag = null;
@@ -396,15 +406,16 @@ function buildTierFlagScan_(tierName, tierSheet) {
     flagContext.experiencedBookshelfTag = bookshelfFlag ? bookshelfFlag.text : "";
     flagContext.experiencedBookshelfEmphasized = !!(bookshelfFlag && bookshelfFlag.emphasized);
     const flagSummary = buildLevelFlagSummary_(analysis, flagContext);
-    if (flagSummary.flags.length > 0) {
+    if (flagSummary.flags.length > 0 || analysis.isPending) {
       const flagRow = buildTierFlagRow_(analysis, flagSummary);
       flagRow.sectionIndex = sectionIndex;
       rows.push(flagRow);
     }
   });
 
-  if (tierName.toLowerCase() === "pending") {
-    rows.sort((a, b) => a.sectionIndex - b.sectionIndex || b.splitMargin - a.splitMargin);
+  if (isPendingTier) {
+    rows.sort((a, b) => a.sectionIndex - b.sectionIndex ||
+      b.splitMargin - a.splitMargin);
   }
 
   return {
@@ -594,6 +605,8 @@ function buildPendingLevelFlagSummary_(analysis, flagContext) {
   } else if (analysis.rawCount <= PENDING_SCAN_LOW_OPINION_MAX_RAW_COUNT) {
     styleKey = "pending_low_count";
     flag = "low opinion count (" + analysis.rawCount + "/3)";
+  } else {
+    styleKey = "pending_unflagged";
   }
 
   return {
@@ -701,10 +714,11 @@ function buildTierFlagRow_(analysis, flagSummary) {
       analysis.levelName,
       formatFlagNumber_(analysis.allWeight),
       analysis.rawCount,
-      flagSummary.flags.join("; "),
+      flagSummary.styleKey === "pending_unflagged" ? "no flag" : flagSummary.flags.join("; "),
       comparison.left.label + " / " + comparison.right.label,
       formatFlagNumber_(comparison.left.weight) + " | " + formatFlagNumber_(comparison.right.weight),
-      flagSummary.differenceAlert ? formatComparisonDifference_(comparison) : ""
+      analysis.isPending || flagSummary.differenceAlert
+        ? formatComparisonDifference_(comparison) : ""
     ],
     splitMargin: Math.abs(Number(comparison.left.weight) - Number(comparison.right.weight)),
     styleKey: flagSummary.styleKey || "",
@@ -795,6 +809,8 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
   const fontColors = [];
   const fontWeights = [];
   const fontStyles = [];
+  const fontSizes = [];
+  const isPendingScan = String(rows[0][1] || "").toLowerCase() === "pending";
 
   for (let i = 2; i < rowCount; i++) {
     const row = rows[i];
@@ -804,18 +820,30 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
     const rowFontColors = new Array(colCount).fill("#202124");
     const rowFontWeights = new Array(colCount).fill("normal");
     const rowFontStyles = new Array(colCount).fill("normal");
+    const rowFontSizes = new Array(colCount).fill(10);
+    if (isPendingScan) rowFontColors[6] = "#3c4043";
 
     if (String(row[0] || "") === "No flagged levels") {
       rowBackgrounds.fill("#f5f5f5");
       rowFontColors.fill("#5f6368");
       rowFontStyles.fill("italic");
+    } else if (flagRow && flagRow.styleKey === "pending_unflagged") {
+      rowBackgrounds.fill(flagStyle.background);
+      // De-emphasize status without making the split evidence look disabled.
+      rowFontColors.fill("#3c4043");
+      rowFontColors[0] = flagStyle.text;
+      rowFontColors[3] = flagStyle.text;
     } else {
       rowFontWeights[0] = flagStyle.fontWeight;
       rowBackgrounds[3] = flagStyle.background;
       rowFontColors[3] = flagStyle.text;
       rowFontWeights[3] = flagStyle.fontWeight;
 
-      if (flagStyle.styleDifference) {
+      if (isPendingScan) {
+        rowFontWeights[0] = "bold";
+        rowFontWeights[3] = "bold";
+        rowFontSizes[3] = 11;
+      } else if (flagStyle.styleDifference) {
         rowBackgrounds[6] = flagStyle.background;
         rowFontColors[6] = flagStyle.text;
         rowFontWeights[6] = flagStyle.fontWeight;
@@ -826,6 +854,7 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
     fontColors.push(rowFontColors);
     fontWeights.push(rowFontWeights);
     fontStyles.push(rowFontStyles);
+    fontSizes.push(rowFontSizes);
   }
 
   const resultRange = sh.getRange(3, 1, rowCount - 2, colCount);
@@ -833,7 +862,8 @@ function formatTierFlagScan_(sh, rows, colCount, flagRows) {
     .setBackgrounds(backgrounds)
     .setFontColors(fontColors)
     .setFontWeights(fontWeights)
-    .setFontStyles(fontStyles);
+    .setFontStyles(fontStyles)
+    .setFontSizes(fontSizes);
 
   applyTierFlagSectionBorders_(sh, flagRows, colCount);
 }
