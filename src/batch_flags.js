@@ -403,6 +403,10 @@ function buildTierFlagScan_(tierName, tierSheet) {
     }
   });
 
+  if (tierName.toLowerCase() === "pending") {
+    rows.sort((a, b) => a.sectionIndex - b.sectionIndex || b.splitMargin - a.splitMargin);
+  }
+
   return {
     scanned,
     rows
@@ -702,6 +706,7 @@ function buildTierFlagRow_(analysis, flagSummary) {
       formatFlagNumber_(comparison.left.weight) + " | " + formatFlagNumber_(comparison.right.weight),
       flagSummary.differenceAlert ? formatComparisonDifference_(comparison) : ""
     ],
+    splitMargin: Math.abs(Number(comparison.left.weight) - Number(comparison.right.weight)),
     styleKey: flagSummary.styleKey || "",
     priority: flagSummary.priority || 99,
     subduedLowOpinion: !!flagSummary.subduedLowOpinion
