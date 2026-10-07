@@ -171,7 +171,7 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
     weightsByTier,
     tierRanking,
     currentIdx,
-    rawMedianIdx,
+    isPending ? rawMeanIdx : rawMedianIdx,
     isPending,
     totalWeight,
     splitThreshold,
@@ -201,7 +201,7 @@ function calculateLevelAnalysis_(tierName, levelName, vals, bgs, fcs) {
   const decisionSecondWeight = decisionSecond[1];
   const decisionCurrentTier = isPending ? currentTier : decisionTierName(currentTier);
   const decisionCurrentIdx = decisionOrderedTierNames.indexOf(decisionCurrentTier);
-  const decisionCenterTier = decisionTierName(rawMedianLabel);
+  const decisionCenterTier = decisionTierName(isPending ? rawMeanLabel : rawMedianLabel);
   const decisionCenterIdx = decisionOrderedTierNames.indexOf(decisionCenterTier);
   const decisionTierSplit = calculateSplit_(
     decisionOrderedTierNames,

@@ -181,20 +181,23 @@ function pickSplitLowIdx_(orderedTierNames, weightsByTier, topIdx, runnerIdx, cu
   }
 
   // Placed levels: adjacent top/runner forced
-  // Pending levels: closer side around the winning tier
+  // Pending levels: closer side around the mean tier
   if (!isPending && areAdjacent(topIdx, runnerIdx)) return Math.min(topIdx, runnerIdx);
 
+  const anchorIdx = isPending
+    ? Math.max(0, Math.min(n - 1, Math.round(centerIdx)))
+    : topIdx;
   const candidates = [];
 
-  if (topIdx > 0) {
-    const lowIdx = topIdx - 1;
+  if (anchorIdx > 0) {
+    const lowIdx = anchorIdx - 1;
     candidates.push({ lowIdx, ...boundaryScore(lowIdx) });
   }
-  if (topIdx < n - 1) {
-    const lowIdx = topIdx;
+  if (anchorIdx < n - 1) {
+    const lowIdx = anchorIdx;
     candidates.push({ lowIdx, ...boundaryScore(lowIdx) });
   }
 
   candidates.sort((a, b) => a.score - b.score);
-  return candidates.length ? candidates[0].lowIdx : Math.max(0, topIdx - 1);
+  return candidates.length ? candidates[0].lowIdx : Math.max(0, anchorIdx - 1);
 }
