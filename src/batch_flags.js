@@ -343,14 +343,8 @@ function scanSelectedTierFlagsUnlocked_() {
 }
 
 function getFlagScanTierName_(ss, tool) {
-  const active = ss.getActiveSheet();
-  if (active) {
-    const activeName = active.getName();
-    if (!isAnalyzerUtilitySheetName_(activeName)) return activeName;
-  }
-
-  if (!tool) return "";
-  return String(tool.getRange(TIER_CELL).getDisplayValue() || "").trim();
+  const tierSheet = getSelectedTierSheet_(ss, tool);
+  return tierSheet ? tierSheet.getName() : "";
 }
 
 function buildTierFlagScan_(tierName, tierSheet) {
