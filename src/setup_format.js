@@ -9,9 +9,13 @@ function setManagedSheetColumnCount_(sh, requiredColumns) {
 }
 
 function setupTierAnalysis() {
+  return withAnalyzerDocumentLock_(setupTierAnalysisUnlocked_);
+}
+
+function setupTierAnalysisUnlocked_() {
   const ss = SpreadsheetApp.getActive();
   if (typeof setupTierConfiguration_ !== "function") {
-    SpreadsheetApp.getUi().alert("Tier configuration code is missing");
+    showAnalyzerAlert_(SpreadsheetApp.getUi(), "Tier configuration code is missing");
     return;
   }
   setupTierConfiguration_();

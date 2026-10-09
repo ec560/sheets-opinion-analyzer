@@ -286,6 +286,10 @@ function buildExperiencedPlayerBookshelfTag_(experiencedCount, sampleSize, total
 }
 
 function scanSelectedTierFlags() {
+  return withAnalyzerDocumentLock_(scanSelectedTierFlagsUnlocked_);
+}
+
+function scanSelectedTierFlagsUnlocked_() {
   const ss = SpreadsheetApp.getActive();
   const ui = SpreadsheetApp.getUi();
   const tool = ss.getSheetByName(ANALYSIS_SHEET_NAME);
@@ -293,20 +297,20 @@ function scanSelectedTierFlags() {
     const configResult = loadTierConfiguration_();
     const configError = tierConfigurationErrorMessage_(configResult);
     if (configError) {
-      ui.alert("Error with Tier Configuration", configError, ui.ButtonSet.OK);
+      showAnalyzerAlert_(ui, "Error with Tier Configuration", configError, ui.ButtonSet.OK);
       return;
     }
   }
   const tierName = getFlagScanTierName_(ss, tool);
 
   if (!tierName) {
-    ui.alert("Tier Flag Scan", "Open a tier sheet or pick a tier in " + TIER_CELL + " first.", ui.ButtonSet.OK);
+    showAnalyzerAlert_(ui, "Tier Flag Scan", "Open a tier sheet or pick a tier in " + TIER_CELL + " first.", ui.ButtonSet.OK);
     return;
   }
 
   const tierSheet = ss.getSheetByName(tierName);
   if (!tierSheet || isAnalyzerUtilitySheetName_(tierName)) {
-    ui.alert("Tier Flag Scan", "Could not find a tier sheet named \"" + tierName + "\".", ui.ButtonSet.OK);
+    showAnalyzerAlert_(ui, "Tier Flag Scan", "Could not find a tier sheet named \"" + tierName + "\".", ui.ButtonSet.OK);
     return;
   }
 
@@ -315,21 +319,21 @@ function scanSelectedTierFlags() {
     result = buildTierFlagScan_(tierName, tierSheet);
   } catch (error) {
     if (error && error.name === "ExperiencedPlayerRosterError") {
-      ui.alert("Tier Flag Scan", error.message, ui.ButtonSet.OK);
+      showAnalyzerAlert_(ui, "Tier Flag Scan", error.message, ui.ButtonSet.OK);
       return;
     }
     throw error;
   }
   if (result.scanned === 0) {
     const headerType = tierName.toLowerCase() === "pending" ? "level" : "unlocked level";
-    ui.alert("Tier Flag Scan", "No " + headerType + " headers found on \"" + tierName + "\".", ui.ButtonSet.OK);
+    showAnalyzerAlert_(ui, "Tier Flag Scan", "No " + headerType + " headers found on \"" + tierName + "\".", ui.ButtonSet.OK);
     return;
   }
 
   const outputSheet = renderTierFlagScan_(ss, tierName, result.rows);
   ss.setActiveSheet(outputSheet);
 
-  ui.alert(
+  showAnalyzerAlert_(ui,
     "Tier Flag Scan",
     result.rows.length + (tierName.toLowerCase() === "pending" ? " pending level" : " flagged level") +
       (result.rows.length === 1 ? "" : "s") +

@@ -3,12 +3,16 @@ const LEVEL_UNLOCK_BACKGROUND = "#ffffff";
 const LEVEL_UNLOCK_FONT_COLOR = "#000000";
 
 function toggleSelectedLevelLock() {
+  return withAnalyzerDocumentLock_(toggleSelectedLevelLockUnlocked_);
+}
+
+function toggleSelectedLevelLockUnlocked_() {
   const ss = SpreadsheetApp.getActive();
   const ui = SpreadsheetApp.getUi();
   const target = getSelectedLevelForLocking_(ss);
 
   if (!target) {
-    ui.alert(
+    showAnalyzerAlert_(ui,
       "Level Lock",
       "Open a tier sheet and select any cell within the level's three-column block.",
       ui.ButtonSet.OK
@@ -16,7 +20,7 @@ function toggleSelectedLevelLock() {
     return false;
   }
 
-  return setSelectedLevelLockState_(!isLevelLocked_(target.sheet, target.startCol));
+  return setSelectedLevelLockStateUnlocked_(!isLevelLocked_(target.sheet, target.startCol), target);
 }
 
 function lockSelectedLevel() {
@@ -28,12 +32,16 @@ function unlockSelectedLevel() {
 }
 
 function setSelectedLevelLockState_(shouldLock) {
+  return withAnalyzerDocumentLock_(() => setSelectedLevelLockStateUnlocked_(shouldLock));
+}
+
+function setSelectedLevelLockStateUnlocked_(shouldLock, selectedTarget) {
   const ss = SpreadsheetApp.getActive();
   const ui = SpreadsheetApp.getUi();
-  const target = getSelectedLevelForLocking_(ss);
+  const target = selectedTarget || getSelectedLevelForLocking_(ss);
 
   if (!target) {
-    ui.alert(
+    showAnalyzerAlert_(ui,
       "Level Lock",
       "Open a tier sheet and select any cell within the level's three-column block.",
       ui.ButtonSet.OK
@@ -60,7 +68,7 @@ function setSelectedLevelLockState_(shouldLock) {
   refreshAnalyzerAfterLockChange_(ss, target, shouldLock);
 
   if (failedSegments.length > 0) {
-    ui.alert(
+    showAnalyzerAlert_(ui,
       "Level Lock",
       (shouldLock ? "Locked" : "Unlocked") + " the level, but could not restyle merged row(s) " +
         failedSegments.join(", ") + ". The rows above and below them were still updated.",

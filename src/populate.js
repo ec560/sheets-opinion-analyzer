@@ -123,49 +123,18 @@ function populateSelectedLevel(options) {
   const timer = typeof createAnalyzerPhaseTimer_ === "function"
     ? createAnalyzerPhaseTimer_({ operation: "populate-selected-level" })
     : null;
-  const lock = typeof LockService !== "undefined" && LockService.getDocumentLock
-    ? LockService.getDocumentLock()
-    : null;
-  const lockStartedAt = typeof startAnalyzerPhase_ === "function"
-    ? startAnalyzerPhase_(timer)
-    : Date.now();
   let result = false;
   let failedWithError = false;
-  let lockAcquired = false;
-  let lockPhaseEnded = false;
   try {
-    if (lock) {
-      lock.waitLock(30000);
-      lockAcquired = true;
-    }
-    if (typeof endAnalyzerPhase_ === "function") {
-      endAnalyzerPhase_(timer, "documentLockAcquisition", lockStartedAt);
-    }
-    lockPhaseEnded = true;
     const preparedOptions = Object.assign({}, options || {}, { timing: timer });
-    result = populateSelectedLevelUnlocked_(preparedOptions);
+    result = withAnalyzerDocumentLock_(() => populateSelectedLevelUnlocked_(preparedOptions), timer);
     return result;
   } catch (error) {
     failedWithError = true;
-    if (!lockPhaseEnded && typeof endAnalyzerPhase_ === "function") {
-      endAnalyzerPhase_(timer, "documentLockAcquisition", lockStartedAt);
-    }
     throw error;
   } finally {
-    try {
-      if (lockAcquired) {
-        const releaseStartedAt = typeof startAnalyzerPhase_ === "function"
-          ? startAnalyzerPhase_(timer)
-          : Date.now();
-        lock.releaseLock();
-        if (typeof endAnalyzerPhase_ === "function") {
-          endAnalyzerPhase_(timer, "documentLockRelease", releaseStartedAt);
-        }
-      }
-    } finally {
-      if (timer && typeof timer.finish === "function") {
-        timer.finish(failedWithError ? "error" : result ? "rendered" : "not-rendered");
-      }
+    if (timer && typeof timer.finish === "function") {
+      timer.finish(failedWithError ? "error" : result ? "rendered" : "not-rendered");
     }
   }
 }
@@ -181,7 +150,7 @@ function populateSelectedLevelUnlocked_(options) {
     endAnalyzerPhase_(timer, "analyzerSheetLookup", phaseStartedAt);
   }
   if (!tool) {
-    SpreadsheetApp.getUi().alert("Run Tier Tools > Setup before loading a level.");
+    showAnalyzerAlert_(SpreadsheetApp.getUi(), "Run Tier Tools > Setup before loading a level.");
     return false;
   }
   if (!options || !options.skipTierDropdownRefresh) refreshTierDropdown_();

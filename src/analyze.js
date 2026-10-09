@@ -7,7 +7,10 @@ function analyzeSelectedLevel(options) {
       : null);
   let timingOutcome = "not-rendered";
   try {
-    const result = analyzeSelectedLevelWithTiming_(options, timer);
+    const result = withAnalyzerDocumentLock_(
+      () => analyzeSelectedLevelWithTiming_(options, timer),
+      timer
+    );
     timingOutcome = result === true ? "rendered" : "not-rendered";
     return result;
   } catch (error) {
@@ -28,7 +31,7 @@ function analyzeSelectedLevelWithTiming_(options, timer) {
     endAnalyzerPhase_(timer, "analysisSheetLookup", phaseStartedAt);
   }
   if (!tool) {
-    SpreadsheetApp.getUi().alert("Run Tier Tools > Setup before analyzing opinions.");
+    showAnalyzerAlert_(SpreadsheetApp.getUi(), "Run Tier Tools > Setup before analyzing opinions.");
     return false;
   }
 
@@ -99,7 +102,7 @@ function analyzeSelectedLevelWithTiming_(options, timer) {
     const configError = tierConfigurationErrorMessage_(configResult);
     if (configError) {
       setAnalysisStatusMessage_(tool, "Error with Tier Configuration", "#fce8e6");
-      SpreadsheetApp.getUi().alert(configError);
+      showAnalyzerAlert_(SpreadsheetApp.getUi(), configError);
       return;
     }
   }
@@ -121,7 +124,7 @@ function analyzeSelectedLevelWithTiming_(options, timer) {
   const tierName = expectedTierName;
   const levelName = expectedLevelName;
   if (!tierName || !levelName) {
-    SpreadsheetApp.getUi().alert("Pick a tier and a level first.");
+    showAnalyzerAlert_(SpreadsheetApp.getUi(), "Pick a tier and a level first.");
     return;
   }
   if (!isTierSheetName_(tierName)) {
@@ -139,7 +142,7 @@ function analyzeSelectedLevelWithTiming_(options, timer) {
   } else {
     const lastRow = tool.getLastRow();
     if (lastRow < DATA_START_ROW) {
-      SpreadsheetApp.getUi().alert("No opinions pasted yet. Pick the level dropdown again.");
+      showAnalyzerAlert_(SpreadsheetApp.getUi(), "No opinions pasted yet. Pick the level dropdown again.");
       return;
     }
 
